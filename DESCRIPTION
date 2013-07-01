@@ -1,0 +1,12 @@
+Package: RCodeGen
+Version: 0.1-0
+Title: Functionality to help creating code for R, C/C++
+Author: Duncan Temple Lang
+Maintainer: Duncan Temple Lang <duncan@r-project.org>
+Description: This is a collection of functions
+  that help us to create R and C/C++ code from
+  within R. These grew out of the RGCCTranslationUnit
+  and RCIndex packages and are now packaged separately.
+License: BSD
+Depends: methods
+URL: http://www.omegahat.org/RCodeGen
