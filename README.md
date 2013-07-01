@@ -22,8 +22,8 @@ uses this.)
 
 This code is used to create code for other packages and these serve as
 examples. See 
-* [RGraphicsDevice](http://github.com/duncantl/RGraphicsDevice), 
-* [RCIndex](http://github.com/duncantl/RClangSimple.git) (named RClangSimple on github), and
+* [RGraphicsDevice](http://github.com/omegahat/RGraphicsDevice), 
+* [RCIndex](http://github.com/omegahat/RClangSimple.git) (named RClangSimple on github), and
 * [RCUDA](http://github.com/duncantl/RCUDA.git)
 packages. See the TU/ directories in those packages.
 
