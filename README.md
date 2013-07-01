@@ -18,3 +18,12 @@ We can obtain a description of the native code elements in various different way
 * gcc-xml emits descriptions of code in an XML format. (The rdyncall package
 uses this.)
 * The SWinTypeLibs package reads information from Windows type libraries.
+
+
+This code is used to create code for other packages and these serve as
+examples. See 
+* [RGraphicsDevice](http://github.com/duncantl/RGraphicsDevice), 
+* [RCIndex](http://github.com/duncantl/RClangSimple.git) (named RClangSimple on github), and
+* [RCUDA](http://github.com/duncantl/RCUDA.git)
+packages. See the TU/ directories in those packages.
+
