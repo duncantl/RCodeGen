@@ -10,7 +10,10 @@ The idea underlying the package is that we have some native code -
 either C or C++ - and we obtain a description of the elements of that
 code. We then generate wrapper functions and routines to interface R
 to that code.  This package provides functionality to help generate
-these wrapper functions and routines.
+these wrapper functions and routines.  Often, one will use contextual
+information to customize these functions. There are several hooks and
+parameters to enable such customization. In other cases, one builds
+new/alternative functions that build on the lower-level functions.
 
 We can obtain a description of the native code elements in various different ways.
 * RCIndex uses the libclang API (and is now my preferred approach).
