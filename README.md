@@ -3,8 +3,9 @@ RCodeGen
 
 Functions to aid generating R and C/C++ code
 
-These functions have grown out of the RGCCTranslationUnit
-and RCIndex packages and I am now putting them in their own package.
+These functions have grown out of the RGCCTranslationUnit and RCIndex
+packages and I am now putting them in their own package, with a focus
+on the RCIndex data types.
 
 The idea underlying the package is that we have some native code -
 either C or C++ - and we obtain a description of the elements of that

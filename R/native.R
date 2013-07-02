@@ -77,7 +77,8 @@ function(type, var, name = getName(type), typeMap = NULL, rvar = "r_ans")
        # allocates new memory and copies the contents.
        # Allow the caller to say what she wants, like the .copy parameter.
 
-      sprintf("R_copyStruct_%s(&%s)", gsub("struct ", "", name), var)
+      fnName = getStructCopyRoutineName(type)
+      sprintf("%s(&%s)", fnName, var)
    } else if(k == CXType_Typedef) {
       convertValueToR(getCanonicalType(type), var, name = name) #  was name instead of getName(type)
    } else if(k == CXType_Enum || (k == CXType_Unexposed && grepl("^enum ", name))) {
@@ -155,6 +156,8 @@ function(param, inputName,  localName = getName(param), type = getType(param),
 getConvertRValue =
 function(type, localName, inputName, decl = getName(type), kind = type$kind, GetRefAddsStar = TRUE)
 {
+#if(localName == "dstContext")browser()
+
      typeName = getName(type)
      if(kind == CXType_Enum || (kind == CXType_Unexposed && grepl("^enum ", typeName))) 
           ans = sprintf("%s = (%s) INTEGER(%s)[0];", localName, decl, inputName)
@@ -164,8 +167,8 @@ function(type, localName, inputName, decl = getName(type), kind = type$kind, Get
       canon = getCanonicalType(type)
       ckind = getTypeKind(canon)
       if(ckind == CXType_Pointer)
-#         ans = sprintf('%s = (%s) getRReference(%s);', localName, decl, inputName)
-         ans = sprintf('%s = GET_REF(%s, %s);', localName, inputName, typeName)
+         ans = sprintf('%s = (%s) getRReference(%s);', localName, decl, inputName)
+#         ans = sprintf('%s = GET_REF(%s, %s);', localName, inputName, typeName)
       else {     #XXX looks wrong.
           # see when we use the name of the canonical type whether this corresponds to a primitive.
          ans = derefRarg(getName(canon), localName, inputName)
@@ -194,7 +197,11 @@ function(type, localName, inputName, decl = getName(type), kind = type$kind, Get
        
     } else if(kind == CXType_Unexposed) {
          # So an opaque data type ?
-      ans = sprintf('%s = * GET_REF(%s, %s);', localName, inputName, sprintf("%s *", decl))
+      # struct cudaPitchedPtr  comes through here. It is a pointer but we can't tell that.
+      # struct cudaExtent
+#browser()
+      ans = sprintf('%s = * (%s *) getRReference(%s);', localName, decl, inputName)              
+#      ans = sprintf('%s = * GET_REF(%s, %s);', localName, inputName, sprintf("%s *", decl))
       #  ans = sprintf('%s = GET_REF(%s, %s);', localName, inputName, getName(type))
     } else {
 #cat('hi\n'); browser()
@@ -229,10 +236,11 @@ function(decl, localName, inputName)
 }
 
 getNativeDeclaration =
-function(varName, type, addSemiColon = TRUE)
+function(varName, type, addSemiColon = TRUE, const = FALSE)
 {
 #  makeLocalVar(, varName, varName, type = type)
-  sprintf("%s %s%s",
+  sprintf("%s %s %s%s",
+            if(const) "const" else "",
              getName(type),
              varName,
             if(addSemiColon) ";" else "")

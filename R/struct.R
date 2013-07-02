@@ -145,7 +145,7 @@ function(fieldName, type, structName, get = TRUE, typeMap = NULL)
 
 
 makeCCopyStructCode =
-function(desc, funName = sprintf("R_copyStruct_%s", gsub("struct ", "", getName(desc$def))), typeMap = NULL)
+function(desc, funName = getStructCopyRoutineName(desc$def), typeMap = NULL)
 {
 
   copyFields =  mapply(function(f, name) {

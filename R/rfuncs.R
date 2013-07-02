@@ -95,7 +95,8 @@ function(parm, name, type = getType(parm), kind = getTypeKind(type))
 #         browser()
          if(length(class) == 0) {
            if(grepl("*", typeName, fixed = TRUE))
-             class = getName(info$baseType)
+              #!!!! changed Jul 2 (2013). Was just getName(info$baseType), i.e. no Ptr.
+             class = sprintf("%sPtr", getName(info$baseType))
            else
               class = typeName # name # assume we are using the name
          }

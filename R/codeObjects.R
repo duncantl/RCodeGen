@@ -174,7 +174,7 @@ setAs("RFunctionDefinition", "character",
             c(if(!is(from, "RAnonymousFunction") && length(from@name) == 0 || is.na(from@name)) "" else paste(from@name, "<-"),
               paste("function(", paste(sig, collapse = ", "), ")"),
               if(!hasOwnBrace) "{",
-              from@code,
+              paste(Indent, from@code),
               if(!hasOwnBrace) "}"
              ), sep = "\n", collapse = "\n")
 
