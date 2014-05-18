@@ -47,9 +47,8 @@ BasicTypeKindNames =
 convertValueToR =
 function(type, var, name = getName(type), typeMap = NULL, rvar = "r_ans")
 {
-
    k = getTypeKind(type)
-#if(name == "Rboolean") browser()   
+
    if(length(m <- lookupTypeMap(typeMap, name, "convertValueToR", type, var, rvar)))
        return(m)
   
@@ -82,7 +81,7 @@ function(type, var, name = getName(type), typeMap = NULL, rvar = "r_ans")
    } else if(k == CXType_Typedef) {
       convertValueToR(getCanonicalType(type), var, name = name) #  was name instead of getName(type)
    } else if(k == CXType_Enum || (k == CXType_Unexposed && grepl("^enum ", name))) {
-      sprintf("Renum_convert_%s(%s)", gsub("^enum ", "", name), var)
+      sprintf("Renum_convert_%s(%s)", gsub("^enum ", "", gsub("::", "_", name)), var)
    } else if(k == CXType_Pointer) {
       if(isStringType(type)) {
         sprintf("mkString(%s)", var) 
@@ -92,6 +91,10 @@ function(type, var, name = getName(type), typeMap = NULL, rvar = "r_ans")
         sprintf('R_createRef(%s, "%s")', var, gsub("const ", "", name))
       }
    } else if(k == CXType_Unexposed) {
+
+      if(name == "std::string")
+         return(convertStdStringToR(var))
+     
       I(c(sprintf("%s * _tmp = (%s *) malloc( sizeof( %s ));", name, name, name),
              sprintf("*_tmp = %s;", var), 
              sprintf('%s%sR_createRef(_tmp, "%s");', rvar, if(nchar(rvar)) " = " else "", gsub("struct ", "", name))))
@@ -103,11 +106,23 @@ function(type, var, name = getName(type), typeMap = NULL, rvar = "r_ans")
       sprintf("convert%sArrayToR(%s, %d, 0, %d)", elTypeName, var, len, len - 1L)
 
    } else {
-      browser()
-     warning("possible problem in convertValueToR for ", name)
-     ""
+          # may be a const type &
+      name = gsub("^const ", "", name)
+      name = gsub("[[:space:]]*&$", "", name)
+     
+      if(name == "std::string")
+         convertStdStringToR(var)
+      else {
+        browser()
+        warning("possible problem in convertValueToR for ", name)
+        ""
+      }
    }
 }
+
+convertStdStringToR =
+function(var)
+   sprintf('mkString(%s.c_str() ? %s.c_str() : "")', var, var)  
 
 capitalize =
 function(x)
@@ -143,6 +158,7 @@ function(param, inputName,  localName = getName(param), type = getType(param),
 
 
    if(length(ans) == 0 || ans == "") {
+     browser()
       warning("possible problem ", decl)
     }
 
@@ -156,8 +172,6 @@ function(param, inputName,  localName = getName(param), type = getType(param),
 getConvertRValue =
 function(type, localName, inputName, decl = getName(type), kind = type$kind, GetRefAddsStar = TRUE)
 {
-#if(localName == "dstContext")browser()
-
      typeName = getName(type)
      if(kind == CXType_Enum || (kind == CXType_Unexposed && grepl("^enum ", typeName))) 
           ans = sprintf("%s = (%s) INTEGER(%s)[0];", localName, decl, inputName)
@@ -199,14 +213,13 @@ function(type, localName, inputName, decl = getName(type), kind = type$kind, Get
          # So an opaque data type ?
       # struct cudaPitchedPtr  comes through here. It is a pointer but we can't tell that.
       # struct cudaExtent
-#browser()
+
       ans = sprintf('%s = * (%s *) getRReference(%s);', localName, decl, inputName)              
 #      ans = sprintf('%s = * GET_REF(%s, %s);', localName, inputName, sprintf("%s *", decl))
       #  ans = sprintf('%s = GET_REF(%s, %s);', localName, inputName, getName(type))
     } else {
-#cat('hi\n'); browser()
+           # This handles basic types
        ans = derefRarg(names(kind), localName, inputName)
-      # ans = paste(localName, ";")
     }
 
     ans
@@ -224,6 +237,7 @@ function(decl, localName, inputName)
         "unsigned long" =,     
         "double" = ,
         ULongLong = ,
+        UInt =,
         "float" = 
             sprintf("%s = REAL(%s)[0];", localName, inputName),
         "short" = ,
@@ -236,13 +250,17 @@ function(decl, localName, inputName)
 }
 
 getNativeDeclaration =
-function(varName, type, addSemiColon = TRUE, const = FALSE)
+function(varName, type, addSemiColon = TRUE, const = FALSE, typeMap = NULL)
 {
 #  makeLocalVar(, varName, varName, type = type)
-  sprintf("%s %s %s%s",
-            if(const) "const" else "",
-             getName(type),
-             varName,
+
+  if(is(type, "CXCursor"))
+    type = type$type
+  
+  sprintf("%s%s %s%s",
+            if(const) "const " else "",
+            getName(type),
+            varName,
             if(addSemiColon) ";" else "")
 }
 

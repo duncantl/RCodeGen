@@ -31,7 +31,7 @@ function(def, routineName = getEnumConvertRoutineName(def), prefix = character()
 	    "\t}\n\n"))
 
 
-  className = getRTypeName(def@name)
+  className = getRTypeName(def@type)
   toR = c(toR,
                "#if defined(USE_S4_ENUMS)", "",
                "SEXP tmp;",

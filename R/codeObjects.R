@@ -18,7 +18,7 @@ setClass("CodeDefinition",
 
 setMethod("show", "CodeDefinition",
            function(object) {
-            cat(object@code, "\n")
+            cat(as(object, "character"), "\n")
            })
 
 setClass("NativeRoutineDefinition",
@@ -224,8 +224,14 @@ function(from, to, code, obj = new("RAsDefinition"))
 }
 
 
-setAs("NativeRoutineDefinition", "character", function(from) from@code)
-
+#setAs("NativeRoutineDefinition", "character", function(from) from@code)
+setAs("NativeRoutineDefinition", "character",
+       function(from) {
+         paste(c(from@declaration,
+           "{",
+           from@code,
+           "}"), collapse = "\n")
+       })
 
 setClass("CRoutineDefinition",
           representation(declaration = "character"),
@@ -249,7 +255,7 @@ function(name, code, nargs = NA, declaration = getDeclaration(code), className =
     obj = new(obj)
   
   obj@name = name
-  if(length(className)) {
+  if(FALSE && length(className)) {
         #XXX  2 is a bit arbitrary, but okay for the moment
     i = if(is(obj, "C++ConstructorDefinition")) 1 else 2
     code[i] = paste(className, "::", code[i])
@@ -358,7 +364,7 @@ function(..., .txt = unlist(list(...)), indent = "", class = "RCode")
 getDeclaration =
 #Edited by Gabe 12/28/2009 because the function was removing the
   #'extern "C" but not the #ifdef __cplusplus and #endif
-  function(obj)
+function(obj)
 {
   if(is(obj, "CRoutineDefinition") && length(obj@declaration))
     return(paste(obj@declaration, ";"))

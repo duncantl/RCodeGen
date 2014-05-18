@@ -2,6 +2,9 @@ lookupTypeMap =
   # rvar is the name of the SEXP target variable
 function(map, typeName, what, type, ...)
 {
+   typeName = gsub("^const ", "", typeName)
+   typeName = gsub("[[:space:]]*&$", "", typeName)   
+  
    if(!(typeName %in% names(map)))
       return(character())
 
@@ -11,7 +14,7 @@ function(map, typeName, what, type, ...)
      return(character())
 
    if(is.function(val))
-      val(..., type = type)
+      val(..., type = type, typeMap = map)
    else if(is.character(val)) {
       args = list(...)
       switch(what,

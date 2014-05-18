@@ -1,5 +1,5 @@
 getRTypeName = 
-function(type,  kind = getTypeKind(type), name = getName(type), typeMap = NULL)
+function(type, kind = getTypeKind(type), name = getName(type), typeMap = NULL)
 {
 
   if(!is.null(typeMap) && !is.null(map <- typeMap[[name]])) {
@@ -26,7 +26,10 @@ function(type,  kind = getTypeKind(type), name = getName(type), typeMap = NULL)
       "externalptr"
     else
       getRTypeName(ty$baseType, typeMap = typeMap)
-      
-  } else
-    stop("don't know the R type for this native type!")
+ 
+  } else if(kind == CXType_Enum) {
+     gsub("enum ", "", name)
+  } else {
+     stop("don't know the R type for this native type!")
+  }
 }
