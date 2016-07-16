@@ -28,7 +28,7 @@ function(type, kind = getTypeKind(type), name = getName(type), typeMap = NULL)
       getRTypeName(ty$baseType, typeMap = typeMap)
  
   } else if(kind == CXType_Enum) {
-     gsub("enum ", "", name)
+     enumClassName(name = gsub("enum ", "", name))
   } else {
      stop("don't know the R type for this native type!")
   }
