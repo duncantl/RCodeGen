@@ -1,6 +1,18 @@
 Indent = "   "
+
+enumClassName =
+function(def, name = def@name, removeTrailing = TRUE)
+{
+    name = gsub("^enum ", "", name)
+    if(removeTrailing)
+      gsub("_enum$", "", name)
+    else
+      name
+}
+
 makeEnumDef =
-function(def, name = def@name, decl = getName(def@type))
+    # Compare to makeEnumConverter in nativeEnum.R
+function(def, name = enumClassName(def), decl = getName(def@type))
 {
   name;decl
   if(is(def, "EnumerationDefinition"))
@@ -9,7 +21,7 @@ function(def, name = def@name, decl = getName(def@type))
   def = def[!duplicated(def)]
 
   c("SEXP",
-    sprintf("Renum_convert_%s(%s val)",  name, decl),
+    sprintf("Renum_convert_%s(%s val)", name, decl),
     "{",
     "const char *elName;",
     "switch(val) {",
@@ -23,7 +35,7 @@ function(def, name = def@name, decl = getName(def@type))
 
 
 makeEnumClass =
-function(def, name = def@name, bitwise = FALSE, superClass = if(bitwise) "BitwiseValue" else "EnumValue", prefix = NA)
+function(def, name = enumClassName(def), bitwise = FALSE, superClass = if(bitwise) "BitwiseValue" else "EnumValue", prefix = NA)
 {
   classDef = sprintf('setClass("%s", contains = "%s")', name, superClass)
   
@@ -44,7 +56,7 @@ function(def, name = def@name, bitwise = FALSE, superClass = if(bitwise) "Bitwis
 }
 
 makeBitwiseEnumValues =
-function(def, className = def@name)
+function(def, className = enumClassName(def))
 {
  c(sprintf("%s = BitwiseValue(%dL, '%s', class = '%s')",
             names(def@values), def@values, def@values, className))
@@ -53,7 +65,7 @@ function(def, className = def@name)
 
 
 makeEnumCoerce =
-function(def, name = def@name, bitwise = FALSE, prefix = NA)
+function(def, name = def@name, bitwise = FALSE, prefix = NA, valuesSym = paste0(name, "Values"))
 {
   prefix = if(length(prefix) > 1)
              sprintf("c(%s)", paste(sQuote(prefix),  collapse = ", "))
@@ -63,7 +75,7 @@ function(def, name = def@name, bitwise = FALSE, prefix = NA)
               prefix
 
  cvtCode = 
-         sprintf('as%sValue(from, %sValues, "%s", prefix = %s)', if(bitwise) "Bitwise" else "Enum", name, name, prefix)
+         sprintf('as%sValue(from, %s, "%s", prefix = %s)', if(bitwise) "Bitwise" else "Enum", valuesSym, name, prefix)
               
  sprintf(' setAs("%s", "%s", function(from) %s )', c("character", "integer", "numeric"), name, cvtCode)
 }
