@@ -227,10 +227,11 @@ function(from, to, code, obj = new("RAsDefinition"))
 #setAs("NativeRoutineDefinition", "character", function(from) from@code)
 setAs("NativeRoutineDefinition", "character",
        function(from) {
-         paste(c(from@declaration,
-           "{",
-           from@code,
-           "}"), collapse = "\n")
+         paste(c(#if(!is.na(from@declaration)) from@declaration else character(),
+#           "{",
+           from@code
+#           "}"
+          ), collapse = "\n")
        })
 
 setClass("CRoutineDefinition",
