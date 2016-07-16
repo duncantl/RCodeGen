@@ -81,7 +81,9 @@ function(type, var, name = getName(type), typeMap = NULL, rvar = "r_ans")
    } else if(k == CXType_Typedef) {
       convertValueToR(getCanonicalType(type), var, name = name) #  was name instead of getName(type)
    } else if(k == CXType_Enum || (k == CXType_Unexposed && grepl("^enum ", name))) {
-      sprintf("Renum_convert_%s(%s)", gsub("^enum ", "", gsub("::", "_", name)), var)
+      routine = getEnumConvertRoutineName(type)
+      # gsub("^enum ", "", gsub("::", "_", name))
+      sprintf("%s(%s)", routine, var)
    } else if(k == CXType_Pointer) {
       if(isStringType(type)) {
         sprintf("mkString(%s)", var) 

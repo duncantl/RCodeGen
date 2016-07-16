@@ -14,6 +14,9 @@ makeEnumConverter =
 function(def, routineName = getEnumConvertRoutineName(def), prefix = character(), ...)
 {
   funName = routineName
+
+
+  def@values = def@values[ !duplicated(def@values) ]
   
   toR = c(paste("SEXP", funName, "(",  getName(getCanonicalType(def@type)),  " val)"),
           "{",
@@ -66,5 +69,12 @@ function(def, routineName = getEnumConvertRoutineName(def), prefix = character()
 getEnumConvertRoutineName =
 function(def)
 {
-  sprintf("Renum_convert_%s", gsub("enum ", "", getName(getCanonicalType(def@type))))
+ if(is(def, "CXType"))
+    type = def
+  else
+    type = def@type
+
+#if(grepl("CUfunc_cache", id <- getName(getCanonicalType(type)) ))   recover()
+  
+  sprintf("Renum_convert_%s", gsub("enum ", "", getName(getCanonicalType(type))))
 }  
