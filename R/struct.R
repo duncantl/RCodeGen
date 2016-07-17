@@ -145,8 +145,12 @@ function(fieldName, type, structName, get = TRUE, typeMap = NULL)
 
 
 makeCCopyStructCode =
-function(desc, funName = getStructCopyRoutineName(desc$def), typeMap = NULL)
+function(desc, funName = getStructCopyRoutineName(desc@def), typeMap = NULL)
 {
+  force(funName)   # if given a TypeDefinition, use its name and then get the Struct info.
+  
+  if(is(desc, "TypeDefinition"))
+     desc = getStructDef(desc@type)
 
   copyFields =  mapply(function(f, name) {
                           v = convertValueToR(f, sprintf("obj->%s", name), typeMap = typeMap)
@@ -160,9 +164,9 @@ function(desc, funName = getStructCopyRoutineName(desc$def), typeMap = NULL)
 
                             c(a, sprintf('SET_STRING_ELT(r_names, i++, mkChar("%s"));', name))
                        },
-                       desc$fields, names(desc$fields))
-  nfields = length(desc$fields)
-  sig = sprintf("%s(%s *obj)", funName, getName(getCanonicalType(desc$def)))
+                       desc@fields, names(desc@fields))
+  nfields = length(desc@fields)
+  sig = sprintf("%s(%s *obj)", funName, getName(getCanonicalType(desc@def)))
   code = c("SEXP",
             sig,
            "{",

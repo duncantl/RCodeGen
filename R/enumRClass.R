@@ -1,3 +1,4 @@
+if(FALSE) {
 createRClassDef =
 function(def)
 {  
@@ -111,3 +112,6 @@ function(def)
      }
 
 }  
+
+}
+
