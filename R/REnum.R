@@ -11,12 +11,18 @@ function(def, name = def@name, removeTrailing = TRUE)
 }
 
 makeEnumDef =
+    #
+    #  generate the C routine to convert an enum value to an R object.
+    #
     # Compare to makeEnumConverter in nativeEnum.R
-function(def, name = enumClassName(def), decl = getName(def@type))
+function(def, name = enumClassName(def), decl = getName(def@type), namespace = character())
 {
   name;decl
   if(is(def, "EnumerationDefinition"))
     def = def@values
+
+  if(length(namespace) && nchar(namespace) > 0)
+      names(def) = sprintf("%s::%s", namespace, names(def))
 
   def = def[!duplicated(def)]
 
@@ -35,24 +41,36 @@ function(def, name = enumClassName(def), decl = getName(def@type))
 
 
 makeEnumClass =
+    #
+    # Generate the setClass(), setAs() methods and the Values and individual variables.
+    # i.e. the whole thing.
+    #
 function(def, name = enumClassName(def), bitwise = FALSE, superClass = if(bitwise) "BitwiseValue" else "EnumValue", prefix = NA)
 {
   classDef = sprintf('setClass("%s", contains = "%s")', name, superClass)
-  
+
+  values = as.integer(def@values)
+  strVals = sprintf("%dL", values)
+  i = is.na(values)
+  if(any(i)) 
+     strVals[i] = "NA"
+
+      
+
   c(classDef, "",
-    sprintf("%sValues = structure(c(%s), .Names = c(%s))",
-         name, paste(def@values, "L", sep = "", collapse = ", "),  paste(sQuote(names(def@values)), collapse = ", ")),
+    sprintf("%s = %sValues = structure(c(%s), .Names = c(%s))",
+         name, name, paste(strVals, sep = "", collapse = ", "),  paste(sQuote(names(def@values)), collapse = ", ")),
     "",
     if(bitwise)
        makeBitwiseEnumValues(def, name)
     else
-       sprintf("`%s` = GenericEnumValue('%s', %dL, '%s')", names(def@values), names(def@values), as.integer(def@values), rep(name, length(def@values))),
+       sprintf("`%s` = GenericEnumValue('%s', %s, '%s')", names(def@values), names(def@values), strVals, rep(name, length(def@values))),
 
     "",
 
     makeEnumCoerce(def, name, bitwise, prefix = prefix)
     
-    )
+   )
 }
 
 makeBitwiseEnumValues =

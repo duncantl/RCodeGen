@@ -1,27 +1,50 @@
+#
+# A C++ method created in RCIndex via readCppClass() (called  from getCppClasses())
+# is not a FunctionDecl object expected here, but instead a simple list with the same
+# elements but not an S4 class. So let's convert that.
+
+
 createRProxy =
-function(fun, name = getName(fun), argNames = names(fun@params),
-          nativeProxyName = sprintf("R_%s", getName(fun)),
+    #
+    # Create a simple R function to call a proxy C routine that we created
+    # to call an actual routine. This coerces its arguments to the appropriate
+    # R type and then uses .Call() to invoke the proxy C routine.
+    #
+    #  We've added new parameters so anthing calling this (code in CUDA, RCIndex but not in the NAMESPACE)
+    #
+    #
+function(fun, name = getName(fun),
+          params = fun@params,
+          argNames = names(params),
+          returnType = fun@returnType,
+          nativeProxyName = sprintf("R_%s", name),
           PACKAGE = NA, defaultValues = character(), guessDefaults = FALSE,
           typeMap = NULL, libPrefix = "clang_")
 {
+    
    if(length(libPrefix))
-     name = gsub(sprintf("^%s", libPrefix), "", name)
+      name = gsub(sprintf("^%s", libPrefix), "", name)
   
    if(any(w <- (argNames == ""))) 
       argNames[w] = sprintf("arg%d", which(w))
   
-   coercedArgs = makeCoercedArgs(fun@params, argNames)
+   coercedArgs = makeCoercedArgs(params, argNames)
+   if(is(fun, "C++ClassMethod")) {
+      coercedArgs = c(sprintf("as(this, '%s')", fun@className), coercedArgs)
+      argNames = c("this", argNames)
+   }
+   
    call = c(sprintf(".Call('%s'",  nativeProxyName),
-             if(length(fun@params)) ", ", 
+             if(length(coercedArgs)) ", ", 
              paste(c(coercedArgs, if(!is.na(PACKAGE)) c(PACKAGE = PACKAGE)), collapse = ", "),
             ")")
    call = paste(call, collapse = "")
    
 #   sig = makeSignature(argNames, fun@params, defaultValues, guessDefaults)
 
-   rt = fun@returnType
+   rt = returnType
    if(FALSE && length(fun$actualReturnType))
-     rt = fun$actualReturnType
+      rt = fun$actualReturnType
 
    map = lookupTypeMap(typeMap, getName(rt), "RcoerceResult", rt, name = "ans")   
    
@@ -34,6 +57,21 @@ function(fun, name = getName(fun), argNames = names(fun@params),
           )
 
    RFunctionDefinition(name, code, argNames)
+}
+
+
+
+createRMethodProxy =
+function(fun, typeMap = NULL)
+{
+#browser()    
+    # If this is a C++ClassMethod, then we need to add the this as a parameter.
+    # Unfortunately, we have the CXType for the class, not for the pointer to the class
+    # and we cannot create a new type which isa a  pointer to this class.
+    # If we were using the clang C++ API, we probably would be able to do this.
+   
+#   params = c(r_this = , fun@params)
+   createRProxy(fun, params = params, typeMap= typeMap)
 }
 
 makeSignature =

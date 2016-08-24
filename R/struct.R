@@ -162,7 +162,7 @@ function(desc, funName = getStructCopyRoutineName(desc@def), typeMap = NULL)
                                 else
                                  v
 
-                            c(a, sprintf('SET_STRING_ELT(r_names, i++, mkChar("%s"));', name))
+                            c(a, sprintf('SET_STRING_ELT(r_names, i++, Rf_mkChar("%s"));', name))
                        },
                        desc@fields, names(desc@fields))
   nfields = length(desc@fields)

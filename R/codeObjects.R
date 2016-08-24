@@ -227,10 +227,10 @@ function(from, to, code, obj = new("RAsDefinition"))
 #setAs("NativeRoutineDefinition", "character", function(from) from@code)
 setAs("NativeRoutineDefinition", "character",
        function(from) {
-         paste(c(#if(!is.na(from@declaration)) from@declaration else character(),
-#           "{",
-           from@code
-#           "}"
+         paste(c(if(!is.na(from@declaration)) from@declaration else character(),
+           "{",
+           from@code,
+           "}"
           ), collapse = "\n")
        })
 
@@ -306,7 +306,7 @@ function(name, code, signature = NA, defaults = character(), obj = new("RFunctio
     code = deparse(b)
     
   } else
-    obj@signature = signature
+    obj@signature = as.character(signature)
 
   if(!missing(defaults))
     obj@paramDefaults = defaults

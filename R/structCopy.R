@@ -215,7 +215,7 @@ function(type, name = type$name, free = "free", typeMap = list())
      "#endif",
      '    free(ans);',
      '}',         
-     "return(ScalarLogical(ans ? TRUE : FALSE));",
+     "return(R_ScalarLogical(ans ? TRUE : FALSE));",
      "}")    
 
   structure(list(finalizer = CRoutineDefinition(ids["finalizer"], finalizer, 1L),

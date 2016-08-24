@@ -62,10 +62,10 @@ function(type, var, name = getName(type), typeMap = NULL, rvar = "r_ans")
                    Float=,
                    Int128=,
                    ULong =,
-                   UInt = sprintf("ScalarReal(%s)", var),
+                   UInt = sprintf("Rf_ScalarReal(%s)", var),
                    Short=,
-                   Int = sprintf("ScalarInteger(%s)", var),
-                   Bool = sprintf("ScalarLogical(%s)", var),
+                   Int = sprintf("Rf_ScalarInteger(%s)", var),
+                   Bool = sprintf("Rf_ScalarLogical(%s)", var),
                    NullPtr = "R_NilValue",
                    Void= character()
                    ))
@@ -86,7 +86,7 @@ function(type, var, name = getName(type), typeMap = NULL, rvar = "r_ans")
       sprintf("%s(%s)", routine, var)
    } else if(k == CXType_Pointer) {
       if(isStringType(type)) {
-        sprintf("mkString(%s)", var) 
+        sprintf("Rf_mkString(%s)", var) 
       } else {
         if(grepl("*", name, fixed = TRUE))
           name = gsub(" ?\\*", "Ptr", name)
@@ -124,7 +124,7 @@ function(type, var, name = getName(type), typeMap = NULL, rvar = "r_ans")
 
 convertStdStringToR =
 function(var)
-   sprintf('mkString(%s.c_str() ? %s.c_str() : "")', var, var)  
+   sprintf('Rf_mkString(%s.c_str() ? %s.c_str() : "")', var, var)  
 
 capitalize =
 function(x)
@@ -143,11 +143,11 @@ function(params, rNames, argNames = names(params), ...)
 
 makeLocalVar =
 function(param, inputName,  localName = getName(param), type = getType(param),
-            decl = getName(type), GetRefAddsStar = TRUE, typeMap = NULL, addDecl = FALSE)
+            decl = getName(type), GetRefAddsStar = TRUE, typeMap = NULL, addDecl = FALSE, cast = "")
 {
    kind = getTypeKind(type)
 
-   if(length(m <- lookupTypeMap(typeMap, decl, "convertRValue", type, localName, inputName))) {
+   if(length(m <- lookupTypeMap(typeMap, decl, "convertRValue", type, localName, inputName, cast = cast))) {
      if(addDecl)
        m = paste(decl, m)
      return(m)
@@ -156,7 +156,7 @@ function(param, inputName,  localName = getName(param), type = getType(param),
    ans = derefRarg(decl, localName, inputName)
 
    if(length(ans) == 0) 
-     ans = getConvertRValue(type, localName, inputName, decl, kind, GetRefAddsStar = GetRefAddsStar)
+     ans = getConvertRValue(type, localName, inputName, decl, kind, GetRefAddsStar = GetRefAddsStar, typeMap = typeMap, cast = cast)
 
 
    if(length(ans) == 0 || ans == "") {
@@ -172,7 +172,11 @@ function(param, inputName,  localName = getName(param), type = getType(param),
 
 
 getConvertRValue =
-function(type, localName, inputName, decl = getName(type), kind = type$kind, GetRefAddsStar = TRUE)
+    #
+    #
+    #
+    #
+function(type, localName, inputName, decl = getName(type), kind = type$kind, GetRefAddsStar = TRUE, typeMap = NULL, cast = "")
 {
      typeName = getName(type)
      if(kind == CXType_Enum || (kind == CXType_Unexposed && grepl("^enum ", typeName))) 
@@ -189,7 +193,7 @@ function(type, localName, inputName, decl = getName(type), kind = type$kind, Get
           # see when we use the name of the canonical type whether this corresponds to a primitive.
          ans = derefRarg(getName(canon), localName, inputName)
          if(length(ans) == 0)
-           return(makeLocalVar( , inputName, localName, type = canon, decl = decl))
+           return(makeLocalVar( , inputName, localName, type = canon, decl = decl, typeMap = typeMap))
        }
      } else if(kind == CXType_Record) {
        ans = sprintf('%s = * GET_REF(%s, %s);', localName, inputName, decl)
@@ -200,7 +204,7 @@ function(type, localName, inputName, decl = getName(type), kind = type$kind, Get
            # char **
           ans = sprintf("%s = getCharArrayPtr(%s);", localName, inputName)
        } else if(isStringType(type)) {
-          ans = sprintf("%s = CHAR(STRING_ELT(%s, 0));", localName, inputName)
+          ans = sprintf("%s = %sCHAR(STRING_ELT(%s, 0));", localName, cast, inputName)
        } else if(info$depth == 1L && isIntegerType(info$baseType)) {
           ans = sprintf("%s = INTEGER(%s);", localName, inputName)
        } else {
@@ -252,12 +256,16 @@ function(decl, localName, inputName)
 }
 
 getNativeDeclaration =
-function(varName, type, addSemiColon = TRUE, const = FALSE, typeMap = NULL)
+function(varName, type, addSemiColon = TRUE, const = FALSE, typeMap = NULL, fromRValue = FALSE)
 {
 #  makeLocalVar(, varName, varName, type = type)
 
   if(is(type, "CXCursor"))
     type = type$type
+
+    # if the initializer is coming from an R character elemet, use const char *
+#  if(fromRValue && getName(type) == "char *")
+#      const = TRUE
   
   sprintf("%s%s %s%s",
             if(const) "const " else "",
@@ -268,7 +276,7 @@ function(varName, type, addSemiColon = TRUE, const = FALSE, typeMap = NULL)
 
 
 convertRValue =
-function(localName, rName, type, typeMap = NULL)
+function(localName, rName, type, typeMap = NULL, cast = character())
 {
-  makeLocalVar(, rName, localName, type = type, typeMap = typeMap, addDecl = FALSE)
+  makeLocalVar(, rName, localName, type = type, typeMap = typeMap, addDecl = FALSE, cast = cast)
 }

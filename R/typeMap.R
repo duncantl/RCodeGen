@@ -1,10 +1,16 @@
 lookupTypeMap =
   # rvar is the name of the SEXP target variable
-function(map, typeName, what, type, ...)
+function(map, typeName, what, type, ..., cast = "")
 {
    typeName = gsub("^const ", "", typeName)
    typeName = gsub("[[:space:]]*&$", "", typeName)   
-  
+
+   if(!(typeName %in% names(map)) && getTypeKind(type) == CXType_Typedef) {
+#     message("looking for canonical type for ", typeName)
+      ntype = getCanonicalType(type)
+      typeName = getName(ntype)
+   }
+   
    if(!(typeName %in% names(map)))
       return(character())
 
@@ -14,11 +20,11 @@ function(map, typeName, what, type, ...)
      return(character())
 
    if(is.function(val))
-      val(..., type = type, typeMap = map)
+      val(..., type = type, typeMap = map, cast = cast)
    else if(is.character(val)) {
       args = list(...)
       switch(what,
-             convertValueToR = sprintf("%s(%s)", val, args[[1]]),
+             convertValueToR = sprintf("%s%s(%s)", cast, val, args[[1]]),
              character())
    }
 }

@@ -1,48 +1,54 @@
 createCppMethod =
-function(mdef, className = getName(getCursorLexicalParent(mdef$def)), classPrefix = "llvm::",
+    #
+    # This is for RCIndex.
+    # 
+function(mdef, className = getName(getCursorLexicalParent(mdef@def)), classPrefix = "",
           typeMap = NULL)
 {
 
-  isStatic = getCursorTokens(mdef$def)[1] == "static"
-  
-  Rname = sprintf("R_%s_%s", className, mdef$name)
+  isStatic = getCursorTokens(mdef@def)[1] == "static"
 
-  params = mdef$params
-  
+    # The name of the R proxy routine.
+  Rname = sprintf("R_%s_%s", className, mdef@name)
+
+  params = mdef@params
+
+    # The signature for the routine, adding r_tthis if this is a member method.
   decl = sprintf("SEXP %s(%s%s%s)" ,
-                   if(isStatic) "" else "SEXP r_obj",
-                   Rname, if(length(params)) ", " else "",
+                   Rname,
+                   if(isStatic) "" else "SEXP r_tthis",
+                   if(length(params) && !isStatic) ", " else "",
                    if(length(params))
                      paste("SEXP", paste0("r_", names(params)), sep = " ", collapse = ", ")
                    else "")
   
-  if(length(mdef$params))
-    cargs = paste(names(mdef$params), collapse = ", ")
+  if(length(mdef@params))
+    cargs = paste(names(mdef@params), collapse = ", ")
   else
     cargs = ""
 
 
+    # Add code for constructor and destructor methods
   call = if(isStatic)
-            sprintf("%s::%s(%s);", className, mdef$name, cargs)
+            sprintf("%s::%s(%s);", className, mdef@name, cargs)
          else
-            sprintf("obj->%s(%s);", mdef$name, cargs)
+            sprintf("tthis->%s(%s);", mdef@name, cargs)
   
-  retType = getResultType(mdef$def$type)
+  retType = getResultType(mdef@def$type)
   ansDecl = getNativeDeclaration("ans", retType, typeMap = typeMap)
 
 
   if(length(params)) {
-    args = mapply(function(id, rid, type) {
-                    c(getNativeDeclaration(id, type$type, typeMap = typeMap),
-                       convertRValue(id, rid, type$type, typeMap))
-                  },
-                  names(params), sprintf("r_%s", names(params)), params)
+    args = mapply(createInitLocalVar, names(params),
+                                      sprintf("r_%s", names(params)),
+                                      params,
+                   MoreArgs = list(typeMap = typeMap))
   } else
     args = character()
   
   # static method is different
   code = c(if(!isStatic)
-              sprintf("%s%s *obj = GET_REF(r_obj, %s);", classPrefix, className, className),
+              sprintf("%s%s *tthis = GET_REF(r_tthis, %s);", classPrefix, className, className),
            if(isVoidType(retType))
              c(args, call, "return(R_NilValue);")
            else 
@@ -53,7 +59,24 @@ function(mdef, className = getName(getCursorLexicalParent(mdef$def)), classPrefi
                "return(r_ans);")
               )
 
-  `C++MethodDefinition`(Rname, code, length(mdef$params) + 1, decl,
+  `C++MethodDefinition`(Rname, code, length(mdef@params) + 1, decl,
                           className = className)
 }
 
+createInitLocalVar =
+function(id, rid, type, typeMap) {
+   decl = getNativeDeclaration(id, type$type, typeMap = typeMap, fromRValue = TRUE)
+
+
+   if(type$kind == CXCursor_ParmDecl)
+       type = type$type
+       
+   if(getName(type) == "char *")
+      cast = "(char *)"
+   else
+      cast = ""
+
+   rhs = convertRValue(id, rid, type, typeMap, cast = cast)   
+
+   c(decl, rhs)
+}    
