@@ -1,0 +1,325 @@
+<article xmlns:r="http://www.r-project.org"
+         xmlns:xi="http://www.w3.org/2003/XInclude"
+	 xmlns:c="http://www.C.org"
+	 xmlns:cpp="http://www.C++.org"
+	 xmlns:omg="http://www.omegahat.org">
+
+<articleinfo>
+
+<title></title>
+
+<author><firstname>Duncan</firstname><surname>Temple Lang</surname>
+  <affiliation><orgname>University of California at Davis</orgname>
+               <orgdiv>Data Science Initiative</orgdiv>
+               <orgdiv>Department of Statistics</orgdiv>
+  </affiliation>
+</author>
+</articleinfo>
+
+<section>
+<title></title>
+
+<para>
+We'll look at some specific examples. These come from reading the LLVM C++ API header files.
+<r:code>
+library(RCIndex)
+args = c("-xc++", "-DNDEBUG", "-D_GNU_SOURCE", "-D__STDC_CONSTANT_MACROS", "-D__STDC_FORMAT_MACROS", "-D__STDC_LIMIT_MACROS",
+         "-std=c++11", "-fvisibility-inlines-hidden", "-fno-exceptions", "-fno-rtti", "-fno-common", "-Woverloaded-virtual",
+         "-Wcast-qual")
+tu = createTU("llvm.cpp", args = args, includes = "/usr/local/include/llvm")
+</r:code>
+Next, we gather information about all the C++ classes. (This takes a little less than 2 minutes on my Macbook Pro!)
+<r:code>
+k = getCppClasses(tu)
+</r:code>
+We can find the names of all the classes with
+<r:code>
+names(k)
+</r:code>
+</para>
+<para>
+We'll focus first on  the <cpp:class>DataLayout</cpp:class>.
+<r:code>
+names(k$DataLayout@methods)
+<r:output><![CDATA[
+ [1] "findPointerLowerBound"           "setAlignment"                    "getAlignmentInfo"                "setPointerAlignment"            
+ [5] "getAlignment"                    "validAlignment"                  "validPointer"                    "parseSpecifier"                 
+ [9] "clear"                           "DataLayout"                      "init"                            "operator="                      
+[13] "operator=="                      "operator!="                      "reset"                           "isLittleEndian"                 
+[17] "isBigEndian"                     "getStringRepresentation"         "isDefault"                       "isLegalInteger"                 
+[21] "isIllegalInteger"                "exceedsNaturalStackAlignment"    "getStackAlignment"               "hasMicrosoftFastStdCallMangling"
+[25] "hasLinkerPrivateGlobalPrefix"    "getLinkerPrivateGlobalPrefix"    "getGlobalPrefix"                 "getPrivateGlobalPrefix"         
+[29] "getManglingComponent"            "fitsInLegalInteger"              "getPointerABIAlignment"          "getPointerPrefAlignment"        
+[33] "getPointerSize"                  "getPointerSizeInBits"            "getPointerTypeSizeInBits"        "getPointerTypeSize"             
+[37] "getTypeSizeInBits"               "getTypeStoreSize"                "getTypeStoreSizeInBits"          "getTypeAllocSize"               
+[41] "getTypeAllocSizeInBits"          "getABITypeAlignment"             "getABIIntegerTypeAlignment"      "getPrefTypeAlignment"           
+[45] "getPreferredTypeAlignmentShift"  "getIntPtrType"                   "getSmallestLegalIntType"         "getLargestLegalIntType"         
+[49] "getLargestLegalIntTypeSize"      "getIndexedOffset"                "getStructLayout"                 "getPreferredAlignment"          
+[53] "getPreferredAlignmentLog"       
+]]></r:output>
+</r:code>
+</para>
+<para>
+We'll look at the simple <cpp:func>isLittleEndian</cpp:func> routine:
+<r:code>
+k$DataLayout@methods$isLittleEndian
+<r:output><![CDATA[
+$def
+CXCursor_CXXMethod bool isLittleEndian ( ) const { return ! BigEndian ; } bool 
+
+$access
+ Keyword 
+"public" 
+
+$name
+[1] "isLittleEndian"
+
+$params
+list()
+]]></r:output>
+</r:code>
+This is a publicly accessible routine so we can invoke it.
+It has no parameters as we can see from the params entry in the list.
+Therefore, we would call this in <cpp/> as
+<cpp:code>
+datalayoutInstance->isLittleEndian()
+</cpp:code>
+We would create a wrapper routine in <cpp/> as
+<cpp:code>
+extern "C"
+SEXP
+R_DataLayout_isLittleEndian(SEXP r_datalayout)
+{
+   llvm::DataLayout *datalayout = GET_REF(r_datalayout, llvm::DataLayout);
+   bool  ans = datalayout->isLittleEndian();
+   return(ScalarLogical(ans));
+}
+</cpp:code>
+The <cpp:macro>GET_REF</cpp:macro> is a macro that takes care of extracting the
+pointer to the DataLayout instance from an R object and casting it to the <cpp/> type we expect.
+<q>It also verifies that this object is an instance of the appropriate type. We can do this 
+via run-time query in <cpp/> (RTTI) or by knowing the hierarchy which we can compile at code generation time.</q>
+</para>
+<para>
+Not only do we have to create the <cpp/> wrapper, we also have to create the <r/> function that invokes it.
+<r:code eval="false">
+isLittleEndian =
+function(datalayout)
+{
+   .Call("R_DataLayout_isLittleEndian", as(datalayout, "DataLayout"))
+}
+</r:code>
+However, rather than creating a function for the DataLayout class, we ideally we would want to determine if there are other methods named isLittleEndian in this or any other class,
+i.e., if the method is polymorphic.  In this case it isn't. However, others such as getNumOperands, getOperand,
+getIfExists, clone are overloaded. In this case, we would want to create a generic function and methods for each of
+these.  The method would be 
+<r:code eval="false">
+setMethod("isLittleEndian", "DataLayout",
+           function(x, ...) {
+	      .Call("R_DataLayout_isLittleEndian", x)
+           })
+</r:code>
+Note that we don't have to do the coercion as we know the value of <r:arg>x</r:arg> is a DataLayout object.
+We also assume that the generic has been created with the appropriate signature that is 
+the union of all the methods.
+</para>
+
+<para>
+When creating the function (rather than the method), we also need to add the name of the function to the NAMESPACE
+file.
+So we have three code entries to create: <cpp/> routine, <r/> function, namespace entry.
+</para>
+
+<para>
+Let's look at another method, getTypeSizeInBits.
+<r:code>
+k$DataLayout@methods$getTypeSizeInBits
+<r:output><![CDATA[
+$def
+CXCursor_CXXMethod uint64_t getTypeSizeInBits ( Type * Ty ) const ; 
+
+$access
+ Keyword 
+"public" 
+
+$name
+[1] "getTypeSizeInBits"
+
+$params
+$params[[1]]
+CXCursor_ParmDecl Type * Ty ) 
+]]></r:output>
+</r:code>
+This has one parameter - a pointer to a Type instance,  in addition to the implicit <cpp:this/>.
+The <cpp/> routine we would generate is 
+<cpp:code>
+extern "C"
+SEXP
+R_DataLayout_getTypeSize(SEXP r_datalayout, SEXP r_type)
+{
+  llvm::DataLayout *datalayout = GET_REF(r_datalayout, llvm::DataLayout);
+  llvm::Type *type = GET_REF(r_type, llvm::Type);
+  unsigned ans = datalayout->getTypeSizeInBits(type);
+  return(ScalarInteger(ans));
+}
+</cpp:code>
+The return type may not be quite correct. This is an unsigned integer and it may be too large for a regular signed
+integer. If the value cannot be represented in a regular integer, we should return this as an <r:numeric/> value.
+</para>
+
+
+
+<para>
+Another routine — getLargestLegalIntType  — illustrates another aspect of the <cpp/> language.
+<r:code>
+k$DataLayout@methods$getLargestLegalIntType
+<r:output><![CDATA[
+$def
+CXCursor_CXXMethod Type * getLargestLegalIntType ( LLVMContext & C ) const { unsigned LargestSize = getLargestLegalIntTypeSize ( ) ; return ( LargestSize == 0 ) ? nullptr : Type :: getIntNTy ( C , LargestSize ) ; } /// \brief Returns the size of largest legal integer type size, or 0 if none 
+
+$access
+ Keyword 
+"public" 
+
+$name
+[1] "getLargestLegalIntType"
+
+$params
+$params[[1]]
+CXCursor_ParmDecl LLVMContext & C ) 
+]]></r:output>
+</r:code>
+This takes one argument – a reference to a LLVMContext object.
+The argument to this routine is a reference to an instance, and not a pointer to the instance.
+To cross the interface between <cpp/> and <r/>, we need to deal with pointers and not actual objects.
+So in this case, the argument from <r/> will be a pointer to an LLVM Context.
+So the <cpp/> routine we would create is 
+<cpp:code>
+extern "C"
+SEXP
+R_DataLayout_getLargestLegalIntType(SEXP r_datalayout, SEXP r_C)
+{
+    llvm::DataLayout *datalayout = GET_REF(r_datalayout, llvm::DataLayout);
+    llvm::LLVMContext *C = GET_REF(r_C, llvm::LLVMContext);     
+    llvm::Type *ans;
+    ans = datalayout->getLargestLegalIntType(*C);
+    return( R_createRef(ans, "Type") );
+}
+</cpp:code>
+First, we dereference the pointer to the LLVMContext and pass this to the method invocation.
+This method returns a pointer to a  <cpp:type>llvm::Type</cpp:type>.
+We return a reference to this pointer as an externalptr object. The call to <c:routine>R_createRef</c:routine>
+creates an instance of the <r/> class <r:class>Type</r:class> which contains a reference to the 
+<cpp/> address.
+</para>
+
+
+<para>
+We have seen various different characteristics of routines.  All have had zero or one parameters/arguments.
+We can find the methods that have more than one parameter:
+<r:code>
+which(sapply(k$DataLayout@methods, function(x) length(x$params)) > 1)
+<r:output><![CDATA[
+           setAlignment        getAlignmentInfo     setPointerAlignment            getAlignment getSmallestLegalIntType        getIndexedOffset 
+                        2                                 3                                    4			      5                             47                      50 
+]]></r:output>
+</r:code>
+We'll look at getIndexedOffset:
+<r:code>
+ k$DataLayout@methods$getIndexedOffset
+<r:output><![CDATA[
+$def
+CXCursor_CXXMethod uint64_t getIndexedOffset ( Type * Ty , ArrayRef < Value * > Indices ) const ; 
+
+$access
+ Keyword 
+"public" 
+
+$name
+[1] "getIndexedOffset"
+
+$params
+$params[[1]]
+CXCursor_ParmDecl Type * Ty , 
+
+$params[[2]]
+CXCursor_ParmDecl ArrayRef < Value * > Indices ) 
+]]></r:output>
+</r:code>
+This is somewhat complicated. It takes two arguments, in addition to the DataLayout instance.
+The first argument is a simple pointer to a <cpp:class>Type</cpp:class>. 
+The second is a reference to a Array, an ArrayRef. It is a <cpp/> template -
+<cpp:type><![CDATA[ ArrayRef<Value *>]]></cpp:type>.
+An ArrayRef is a reference to an  collection of elements, and in this case, each element is a pointer to an
+llvm::Value instance.
+We have two choices when creating the interface to this method:
+1) have a separate routine and <r/> function that creates the ArrayRef as an <r/> object and then we pass this to
+getIndexedOffset, or
+2) we pass our R_DataLayout_getIndexedOffset routine an <r/> list of elements and it creates the ArrayRef.
+We can implement this as
+<cpp:code><![CDATA[
+extern "C"
+SEXP
+R_DataLayout_getIndexedOffset(SEXP r_datalayout, SEXP r_indices)
+{
+    llvm::DataLayout *datalayout = GET_REF(r_datalayout, llvm::DataLayout);
+    llvm::ArrayRef<Value *> indices;
+    if(TYPEOF(r_indices) == VECSXP) {
+        std::vector<llvm::Type *> tmp(nargs);
+        for(int i = 0; i < Rf_length(r_indices); i++) {
+            tmp[i] = GET_REF(VECTOR_ELT(r_indices, i), llvm::Type);
+        }
+	indices = makeArrayRef(tmp);
+    } else {
+        indices =  * GET_REF(r_indices, llvm::ArrayRef<llvm::Value*>);
+    }
+
+    uint64_t ans = datalayout->getIndexedOffset(ref);
+    return(ScalarReal(ans));
+}
+]]></cpp:code>
+</para>
+
+<para>
+We can either create two S4 methods for the <r/> wrapper for this routine,
+or we can test the type of the second argument, e.g.,
+<r:code>
+setMethod("geIndexedOffset", c("DataLayout", "list"),
+                    function(datalayout, indices, ...)
+                         .Call("R_DataLayout_getIndexedOffset", datalayout, r_indices)    ) 
+
+setMethod("geIndexedOffset", c("DataLayout", "ArrayRef"),
+                    function(datalayout, indices, ...)
+                         .Call("R_DataLayout_getIndexedOffset", datalayout, r_indices)    ) 
+</r:code>
+or
+<r:code>
+geIndexedOffset = 
+function(datalayout, indices, ...)
+{
+       if(!is.list(indices) && !is(indices, "ArrayRef"))
+          stop("Expecting a list of Value objects, or an ArrayRef for indices")
+         
+      .Call("R_DataLayout_getIndexedOffset", datalayout, r_indices)    
+}
+</r:code>
+We also want to check the types of the elements in the list, e.g., 
+<r:code>
+   if( ! all( sapply(indices, is, "Value") ) )
+        stop("All elements in the indices list() must be Value objects")
+</r:code>
+</para>
+
+
+<para>
+
+</para>
+
+
+
+
+
+</section>
+
+
+</article>
