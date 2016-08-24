@@ -1,0 +1,137 @@
+[check] To create/show the delcaration for a method/routine, just use the cursor tokens directly. 
+     But only for the declaration. Do not include the body.
+  Fix the printing of a C++ method to include the trailing ) at the end.
+
+[check] show method for a C++Method. Add back the signature/declaration and { } around the code.
+   Make certain there wasn't a reason we took them out.
+
+If parameters have no names, deal with this.  (e.g., GfxState getGrayLine)
+ Put them on when we read this in RCIndex, or in createCppMethod()
+
+
+Generate the R functions to call the proxy C rutines.
+
+Enum routines used in the C++ methods.  Declare them and generate them.
+   Can loop over the methods and look at the return types and identify the enums and then
+   put the declarations in a central .h file.
+
+
+
+FIX - handle the cases we explicitly dropped in fun.R
+    enums  (with local enums)
+    returning structs  
+    == for PDFRectangle
+    function pointers
+    constructors  
+
+[TEST at runtime] Guchar * -  Use a typeMap and a RAW().  TET
+    XRef setEncryption -    should this be a raw().
+    Object streamGetChars.  Should we use a raw(). And how do we get the result back. Have to do this in place. (Thomas Kalibera's duplicate issue).
+       
+ 
+Compiles OK:  PageAttrs.cc, RDict, RGfxPath, RGfxSubpath, PDFDoc*, GfxState*, Catalog*, Page*, PDFRectangle*, XRef*, Object*, GfxColorSpace* 
+Problems:  
+
+PDFRectangle & - makeLocalVar() issue.
+
+enums with :: in the name of the routine!   Renum_convert_Catalog::FormType -  Catalog class.
+  These are enums defined within the class. So need to use qualifiers to access them.
+  We probably don't care about forms at this point and the other enums here are for viewer perferences and page layout
+  which are for end-users, not what we are focusing on.
+  We didn't necessarily capture these when processing the C++ class. Should we hang these off the C++Class object representing
+  the code. Do this in cppClasses.R.  But do we want to - what about subclasses, etc.
+
+RGfxColorSpace - 51 errors.
+
+Page -          51 errors. Again, remove the displayPage,... methods
+   That leaves 29 errors. But still function pointers are the primary issue
+   Declarations for local variables of this type are WRONG - type name rather than   in the type.
+
+   Now just a struct copy for Ref.
+
+RPDFRectangle 6 errors - GET REF.  operators ==
+       change name of R proxy to replace == with "equal"
+       We are not using the second argument, i.e. extracting the reference to the r_rect.
+
+RXref - copyStruct_Ref & a Guchar * 
+RObject - copystruct, enum and Guchar *
+*RPDFDoc-  templates and multiple assigments  r_ans = *_tmp = ans  where "*tmp = ans" is probably the RHS of the convertValueToR()
+        FormWidget. Probably omit. getSignatureWidgets
+
+
+
+
+Deal with function pointers in C++ code that we generate. A mess.
+
+Fix the constructor functions not to use obj->Object().
+  This should be obj = new Object() and we don't pass the Object.
+  Change the class hierarchy
+
+Check for overloaded functions , e.g. isStream()  isDict() in Object.
+  Within and across classes.
+  If they exist, make generic function and methods.
+  Change the names of the R proxy routines.
+
+[Check & rationalize] Cast char * from CHAR(STRING_ELT...)
+    Done in cppMethod and now in  a separate function createInitLocalVar. Use this when generating C code.
+
+
+Identify the classes we need to define & export in R as extensions of RC++Reference
+ i.e. the ones we use in createRef().
+
+Fix the Ptr classes, i.e. XRefPtr or XRef for the R class and external ptr symbol.
+
+Respect the class hierarchy in the C++ class definitions.
+  i.e. use setClass("B", contains = "A") where B extends A
+
+Get the default values for a C++ method and ensure they are in the R proxy function.
+
+Function to get the public fields of a class back to R.
+  PDFRectangle
+
+R proxy functions to call C++ proxy routines.
+
+
+
+LOW:
+
+In createCppMethod() (cppMethod.R), use R_clang_CXXMethod_isStatic() rather than working off the cursor tokens.
+  Make a R function to call the C routine that we added.
+  Methods for CXXMethod?
+
+
+------------------------------------------------------------------------------
+
+[Fixed] GfxState - only getting 4 public methods. Mislabelling many as private.
+       The ReusablePathIterator is a nest class. We are recursively processing this and setting the access level to private and then not restoring it.
+       Explicitly skip over this node with a CXChildVisit_Continue
+
+
+[Done] Generate proxies only for public methods.
+  getPublic()
+  Check the @access slot.
+  [Done] We are not adding the access level to the methods.
+
+
+[Done] Add ; after the expression to convert and assign the R object to a C variable for  a GBool.
+  In the typeMap. the convertRValue() needs to assign the value to the C variable and add a ;
+
+
+
+[Done] When show()/print() a curMethod in thecode underlying readCppClass, the parameter cursor that is a pointer to a routine type, the declaration is messed up.
+   The string for the CXCursor for that parameter is fine.
+  So look at the display for C++ClassMethod. 
+  It is the fact that we are adding the name after the type, but that doesn't make sense.
+  [Fixed] But worse is that the parameter names in  the routine being pointed to are becoming parameters in the top-level routine. 
+     e.g.    foo(int x, void (*fun)(int a, int b))  would have 4 parameters x, fun, a, b !!
+     This seems to be because we walk the entire tree including the definition of the types of the parameters and so then find the parameter a in the definition of fun.
+     Use the direct approach rather than the tree walking or else don't recurse in a ParamDecl
+
+  Routine/Function  pointers in declaration are messed up
+    Using the names of the parameters of the routine, not the name of the parameter itself.
+    This is already in the @params of the C++MethodDefinition object
+    So see cppClass.R
+
+
+[Done] Check for static methods we don't have an incorrect before the first parameter.
+ Rpoppler/TU/fun.R:   z = createCppMethod(k$PDFDoc@methods[[2]], typeMap = typemap)
