@@ -11,7 +11,7 @@
 
 createMethod =
 function(fun, baseClassName = getName(getParent(fun@def)), className = paste0("R", baseClassName),
-         typeMap = NULL, defaultValues = character(), addThis = FALSE)
+         typeMap = NULL, defaultValues = character(), addThis = TRUE)
 {
    rt = fun@returnType
 
