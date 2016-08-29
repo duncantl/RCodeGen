@@ -1,0 +1,389 @@
+<?xml version="1.0" encoding="utf-8"?>
+<?xml-stylesheet type="text/xsl" href="Admin/XSL/Todo.xsl" ?> 
+
+<topics xmlns:r="http://www.r-project.org">
+<title>RCodeGen Package</title>
+
+
+<topic>
+<title>Rpoppler</title>
+<items>
+<item>
+FIX - handle the cases we explicitly dropped in fun.R
+<ol>
+<li>  enums  (with local enums)
+</li>
+<li>    returning structs  
+</li>
+<li>  == for PDFRectangle
+</li>
+<li>   function pointers
+</li>
+<li>  [check] constructors  
+</li>
+</ol>
+</item>
+
+<item>
+[TEST at runtime] Guchar * -  Use a typeMap and a RAW().  TET
+    XRef setEncryption -    should this be a raw().
+    Object streamGetChars.  Should we use a raw(). And how do we get the result back. Have to do this in place. (Thomas Kalibera's duplicate issue).
+</item>
+
+<item>
+Compiles OK:  PageAttrs.cc, RDict, RGfxPath, RGfxSubpath, PDFDoc*, GfxState*, Catalog*, Page*, PDFRectangle*, XRef*, Object*, GfxColorSpace* 
+Problems:  
+</item>
+
+<item>
+Convert a SEXP to a char *. See MyClass.h and myclass.R
+</item>
+
+<item>
+PDFRectangle &amp; - makeLocalVar() issue.
+</item>
+
+</items>
+
+<item>
+RGfxColorSpace - 51 errors.
+</item>
+<item>
+Page -          51 errors. Again, remove the displayPage,... methods
+   That leaves 29 errors. But still function pointers are the primary issue
+   Declarations for local variables of this type are WRONG - type name rather than   in the type.
+
+   Now just a struct copy for Ref.
+</item>
+<item>
+RPDFRectangle 6 errors - GET REF.  operators ==
+       change name of R proxy to replace == with "equal"
+       We are not using the second argument, i.e. extracting the reference to the r_rect.
+</item>
+<item>
+RXref - copyStruct_Ref &amp; a Guchar * 
+RObject - copystruct, enum and Guchar *
+*RPDFDoc-  templates and multiple assigments  r_ans = *_tmp = ans  where "*tmp = ans" is probably the RHS of the convertValueToR()
+        FormWidget. Probably omit. getSignatureWidgets
+
+</item>
+
+</topic>
+
+<topic>
+<title>Sub-classes with R functions</title>
+<items>
+
+<item>
+Check if we have to REdeclare static methods as static.
+</item>
+
+<item>
+Allow the caller to return an arbitrary R object and then coerce to the correct type?
+e.g. AsReal() and then.  See getCReturn.
+</item>
+
+<item>
+Consolidate the code in getConvertRValue() and convertRValue().
+The latter now calls the former if it doesn't succeed.
+</item>
+
+<item status="done">
+Complete the coercion generation code for the coercing the SEXP returned from  invokeMethod and returning it as a C
+value.
+See MyClass.h and myClass.R and the 
+</item>
+
+
+<item status="complete">
+For an R-function implemented subclass, allow the caller to set the list of R functions after the object has been
+created.  We use multiple inheritance to add the lookup, setFunctions and invokeMethod() methods at the C++ leve
+by having our our C++  class inherit from RFunctionsNativeMethods.
+But we do need to generate the R &amp; C routines to access (set and get) these methods.
+<br/>
+Create a template for this class, like ROutputDev.{cc,.h} and customize it when building one.
+</item>
+
+<item>
+Generate R code to create the language objects directly in R from
+the list of functions so we don't have to do the allocVector(LANGSXP, *)
+for each call to the same method.
+</item>
+
+
+<item status="done">
+When generating code implementing methods in a subclass (e.g.ROutputDev),
+if there is no function, call the inherited method if it is not pure, not just return.
+</item>
+<item status="done">
+Pass the <b>this</b> to the functions implement a C++ method, if it is not a static method.
+</item>
+<item status="complete">
+For ROutputDev. For an R-function implemented subclass, allow the caller to set the list of R functions after the object has been
+created.
+</item>
+
+</items>
+</topic>
+
+<topic>
+<title>General</title>
+<items>
+
+<item status="done">
+memCheck not being processed so no R function, yet exported.
+<br/>
+Last method in the class that was not getting added.
+</item>
+
+<item>
+Programmatically update NAMESPACE.
+</item>
+
+<item>
+Generate enums for poppler.  
+</item>
+<item>
+Enum routines used in the C++ methods.  Declare them and generate them.
+   Can loop over the methods and look at the return types and identify the enums and then
+   put the declarations in a central .h file.
+</item>
+
+<item>
+enums with :: in the name of the routine!   Renum_convert_Catalog::FormType -  Catalog class.
+  These are enums defined within the class. So need to use qualifiers to access them.
+  We probably don't care about forms at this point and the other enums here are for viewer perferences and page layout
+  which are for end-users, not what we are focusing on.
+  We didn't necessarily capture these when processing the C++ class. Should we hang these off the C++Class object representing
+  the code. Do this in cppClasses.R.  But do we want to - what about subclasses, etc.
+</item>
+
+
+<item>
+Object::getType() is not in the methods. It returns an enum. Add this facility.
+</item>
+
+<item>
+Get the generic definitions to include the correct union of parameters and also default values.
+</item>
+
+<item status="high">
+In Rrawpoppler, Object::isName is overloaded within the class. 
+Need to deal with this.
+<br/>
+When generating the R code, one of the functions generates a setMethod(), but the other doesn't!!!
+<br/>
+Need to get the signature of the R functions in setMethod() to be the correct signature.
+<br/>
+Generation of C++ proxy routine now recognizes this and generates the name of the routine used in the C++ code and the R
+function that calls this. (See getNativeProxyName in rfuncs.R).
+<br/>
+[fixed] Not showing up in readCppClass() results. But is in the @def tokens.
+</item>
+
+<item>
+Get the R function definitions for the OutputDev as a dictionary for others to replicate.
+Have it be an R object that returns these functions.
+See Rpoppler/TU/devices.R 
+</item>
+
+<item status="check">
+The basic version works
+<br/>
+Default values for parameters in R functions.
+Get the default values for a C++ method and ensure they are in the R proxy function.
+<ulink url="http://marc.info/?l=cfe-dev&amp;m=139308250414650&amp;w=2">See here</ulink>
+</item>
+
+<item status="done">
+Mechanism to convert logical to GBool.
+At the R level.
+</item>
+
+<item status="done">
+Move code in Rpoppler/TU/utils.R to RCodeGen.
+</item>
+
+<item status="high">
+Deal with overloaded functions , e.g. isStream()  isDict() in Object.
+  Within and across classes.
+  If they exist, make generic function and methods.
+  Change the names of the R proxy routines.
+<br/>
+Problems with 
+<programlisting><![CDATA[
+setMethod( 'setDisplayProfile' , c( 'GfxColorSpace' ),       
+function( displayProfileA )
+{
+    .Call('R_GfxColorSpace_setDisplayProfile', as(displayProfileA, 'voidPtr'))
+} )
+]]></programlisting>
+<programlisting><![CDATA[
+Error in conformMethod(signature, mnames, fnames, f, fdef, definition) : 
+  in method for ‘setDisplayProfile’ with signature ‘this="GfxColorSpace"’: formal arguments (this = "GfxColorSpace") omitted in the method definition cannot be in the signature
+]]></programlisting>
+Do we need the name of the parameter to be this?
+</item>
+
+<item>
+Make getNativeProxyName() handle overloaded names - across classes and within classes.
+</item>
+
+<item status="done">
+[rerun and test] Syncrhonize the name of the routine that R calls and the one we generate.
+Update createCppMethod() to use the getNativeProxyName().
+
+</item>
+
+<item status="fix">
+Add "extern" C before the routines.
+<br/>
+Done expediently in the utils.R, but should add it to the as(, 'character') method.
+</item>
+
+<item status="check">
+See utils.R in Rpoppler/TU/.  Get the exports for the function names and classes.
+</item>
+
+
+<item status="done">
+Fix createRProxy() when calling a static method. It is adding the this!
+Check with RCodeGen/tests/constructor.R
+</item>
+
+<item status="done">
+When a routine expects a GooString, have R pass a character and convert there. (Sort out cleaning it up.)
+<br/>
+Define a setClassUnion() to allow either. Have a C routine that takes the parameter value passed down by the 
+.Call and ensure a GooString* back.
+The only remaining part is the coercion in the R functions to the set class union.
+[Done] We need to enhance the typeMap for this and makeCoerceArg. 
+</item>
+
+<item>
+Make certain we should be freeing GooString 
+</item>
+
+<item>
+Fix the Ptr classes, i.e. XRefPtr or XRef for the R class and external ptr symbol.
+Why do we use PDFDoc for one pointer type and OutputDevPtr for another?
+<programlisting><![CDATA[
+createRProxy(k$PDFDoc@methods$processLinks, typeMap = typemap)
+    .Call('R_processLinks', as(this, 'PDFDoc'), as(out, 'OutputDevPtr'), as(page, 'integer'))
+]]></programlisting>
+And with ObjectPtr.
+
+
+
+</item>
+
+<item status="check">
+[check] To create/show the delcaration for a method/routine, just use the cursor tokens directly. 
+     But only for the declaration. Do not include the body.
+  Fix the printing of a C++ method to include the trailing ) at the end.
+</item>
+
+<item status="check">
+[check] show method for a C++Method. Add back the signature/declaration and { } around the code.
+   Make certain there wasn't a reason we took them out.
+</item>
+
+<item status="check">
+If parameters have no names, deal with this.  (e.g., GfxState getGrayLine)
+ Put them on when we read this in RCIndex, or in createCppMethod()
+</item>
+
+<item status="check">
+Generate the R functions to call the proxy C routines.
+</item>
+
+
+
+<item>
+Why does leaving out PageAttrs cause errors in the resulting INSTALL of the generated code.
+<programlisting><![CDATA[
+Error in setMethod("getMediaBox", c("PageAttrs"), function(this) { : 
+  no existing definition for function ‘getMediaBox’
+]]></programlisting>
+</item>
+
+<item>
+Deal with function pointers in C++ code that we generate. A mess.
+</item>
+
+<item status="check">
+See RCodeGen/tests/constructor.R
+<br/>
+Fix the constructor functions not to use obj->Object().
+  This should be obj = new Object() and we don't pass the Object.
+  Change the class hierarchy in RCIndex to get the C++ClassMethod, Constructor, Destructor correct to simplify the
+  resulting code.  And have createCppMethod() be a generic dispatching on the class of the method.
+</item>
+
+
+<item status="check">
+[Check &amp; rationalize] Cast char * from CHAR(STRING_ELT...)
+    Done in cppMethod and now in  a separate function createInitLocalVar. Use this when generating C code.
+</item>
+
+<item status="check">
+[For now using all the names in k]
+Identify the classes we need to define &amp; export in R as extensions of RC++Reference
+ i.e. the ones we use in createRef().
+</item>
+
+
+<item status="done">
+Respect the class hierarchy in the C++ class definitions.
+  i.e. use setClass("B", contains = "A") where B extends A
+</item>
+
+
+<item>
+Function to get the public fields of a class back to R.
+  PDFRectangle
+</item>
+
+<item status="done">
+In createCppMethod() (cppMethod.R), use R_clang_CXXMethod_isStatic() rather than working off the cursor tokens.
+  Make a R function to call the C routine that we added.
+  Methods for CXXMethod?
+</item>
+<item status="done">
+[Fixed] GfxState - only getting 4 public methods. Mislabelling many as private.
+       The ReusablePathIterator is a nest class. We are recursively processing this and setting the access level to private and then not restoring it.
+       Explicitly skip over this node with a CXChildVisit_Continue
+</item>
+<item status="done">
+[Done] Generate proxies only for public methods.
+  getPublic()
+  Check the @access slot.
+  [Done] We are not adding the access level to the methods.
+</item>
+<item status="done">
+[Done] Add ; after the expression to convert and assign the R object to a C variable for  a GBool.
+  In the typeMap. the convertRValue() needs to assign the value to the C variable and add a ;
+
+</item>
+<item status="done">
+[Done] When show()/print() a curMethod in thecode underlying readCppClass, the parameter cursor that is a pointer to a routine type, the declaration is messed up.
+   The string for the CXCursor for that parameter is fine.
+  So look at the display for C++ClassMethod. 
+  It is the fact that we are adding the name after the type, but that doesn't make sense.
+  [Fixed] But worse is that the parameter names in  the routine being pointed to are becoming parameters in the top-level routine. 
+     e.g.    foo(int x, void (*fun)(int a, int b))  would have 4 parameters x, fun, a, b !!
+     This seems to be because we walk the entire tree including the definition of the types of the parameters and so then find the parameter a in the definition of fun.
+     Use the direct approach rather than the tree walking or else don't recurse in a ParamDecl
+
+  Routine/Function  pointers in declaration are messed up
+    Using the names of the parameters of the routine, not the name of the parameter itself.
+    This is already in the @params of the C++MethodDefinition object
+    So see cppClass.R
+</item>
+<item status="done">
+[Done] Check for static methods we don't have an incorrect before the first parameter.
+ Rpoppler/TU/fun.R:   z = createCppMethod(k$PDFDoc@methods[[2]], typeMap = typemap)
+</item>
+</items>
+</topic>
+</topics>
