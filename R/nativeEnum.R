@@ -1,4 +1,4 @@
-
+# Compare with code in REnum.R
 #
 # Generate the native code for an enum
 #
