@@ -5,13 +5,18 @@ tu = createTU("MyClass.h", args = "-xc++")
 kk = getCppClasses(tu)
 names(kk)
 
-source("genOutputDev.R")
+#source("genOutputDev.R")
 
 # First method
-m = createMethod(kk[[1]]@methods[[1]], baseClassName = getName(kk[[1]]))
+m = createMethod(kk[[1]]@methods[[1]], className = "RMyClass", baseClassName = getName(kk[[1]]))
 
 # All methds
-mm = lapply(kk[[1]]@methods, createMethod, baseClassName = getName(kk[[1]]))
+mm = lapply(kk[[1]]@methods, createMethod,  baseClassName = getName(kk[[1]]))
 invisible(sapply(mm, function(x) cat(x$code, sep = "\n")))
+
+
+z = defineRSubclass(kk[[1]])
+cat(z, sep = "\n")
+
 
 

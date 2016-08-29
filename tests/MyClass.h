@@ -9,4 +9,11 @@ public:
     virtual int  e(int x) = 0;
 
     static char *getName(int other);
+
+protected:
+    int p();
+
+private:
+    int priv();
+
 };
