@@ -4,9 +4,8 @@ createNativeProxy =
   # RCUDA for  example does not add a *, but in RCIndex we do add the *.
 function(fun, name = sprintf("R_%s", getName(fun)), typeMap = NULL, GetRefAddsStar = TRUE)
 {
+   fun = fixParamNames(fun)
    argNames = names(fun@params)
-   if(any(w <- (argNames == ""))) 
-      argNames[w] = sprintf("arg%d", which(w))
 
    rargNames = sprintf("r_%s", argNames)
 
@@ -34,6 +33,18 @@ function(fun, name = sprintf("R_%s", getName(fun)), typeMap = NULL, GetRefAddsSt
            )
 
    CRoutineDefinition(name, code, length(fun@params), as.character(NA))
+}
+
+
+fixParamNames =
+function(method)
+{
+   if(is.null(names(method@params)))
+       names(method@params) = sprintf("arg%d", seq(along = method@params))
+   else  if(any(w <- (names(method@params) == ""))) 
+      names(method@params)[w] = sprintf("arg%d", which(w))
+
+   method
 }
 
 BasicTypeKindNames =
@@ -90,7 +101,7 @@ function(type, var, name = getName(type), typeMap = NULL, rvar = "r_ans")
       } else {
         if(grepl("*", name, fixed = TRUE))
           name = gsub(" ?\\*", "Ptr", name)
-        sprintf('R_createRef(%s, "%s")', var, gsub("const ", "", name))
+        sprintf('R_createRef(%s, "%s", NULL)', var, gsub("const ", "", name))
       }
    } else if(k == CXType_Unexposed) {
 
@@ -99,7 +110,7 @@ function(type, var, name = getName(type), typeMap = NULL, rvar = "r_ans")
      
       I(c(sprintf("%s * _tmp = (%s *) malloc( sizeof( %s ));", name, name, name),
              sprintf("*_tmp = %s;", var), 
-             sprintf('%s%sR_createRef(_tmp, "%s");', rvar, if(nchar(rvar)) " = " else "", gsub("struct ", "", name))))
+             sprintf('%s%sR_createRef(_tmp, "%s", NULL);', rvar, if(nchar(rvar)) " = " else "", gsub("struct ", "", name))))
    } else if(k == CXType_ConstantArray) {
 
       el = getElementType(type)
