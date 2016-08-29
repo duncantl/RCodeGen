@@ -26,7 +26,7 @@ setClass("NativeRoutineDefinition",
 
 setClass("RFunctionDefinition",
            representation(signature = "character",
-                          paramDefaults = "character",
+                          paramDefaults = "list",  # was character.
                           paramHasDefault = "logical"),
            contains = 'CodeDefinition')
 
@@ -53,16 +53,16 @@ setClass("R$<-Definition", contains = "RMethodDefinition",
 
 setClass("R[Definition", contains = "RMethodDefinition",
                   prototype = list(signature = c("x", "i", "j", "...", "drop"),
-                                   paramDefaults = c(drop = "TRUE"),
+                                   paramDefaults = list(drop = "TRUE"),
                                     nargs = 5L, name = "["))
 
 setClass("R[[Definition", contains = "RMethodDefinition",
                   prototype = list(signature = c("x", "i", "j", "...", "exact"),
-                                   paramDefaults = c(exact = "TRUE"),
+                                   paramDefaults = list(exact = "TRUE"),
                                     nargs = 3L, name = "[["))
 setClass("R[[<-Definition", contains = "RMethodDefinition",
                   prototype = list(signature = c("x", "i", "j", "...", "exact", "value"),
-                                   paramDefaults = c(exact = "TRUE"),
+                                   paramDefaults = list(exact = "TRUE"),
                                     nargs = 3L, name = "[[<-"))
 
 setClass("RAsDefinition", contains = "RMethodDefinition",
@@ -116,7 +116,7 @@ function(class, code, set = FALSE, copy = FALSE, obj = new(if(set) "R[[<-Definit
 {
   if(copy) {
     obj@signature = c(obj@signature, "copy")
-    obj@paramDefaults["copy"] = "TRUE"
+    obj@paramDefaults[["copy"]] = "TRUE"
   }
 
   RMethodDefinition(obj@name, class, code, obj@signature, obj@paramDefaults, obj)
@@ -128,7 +128,7 @@ function(class, code, set = FALSE, copy = FALSE, obj = new(if(set) "R[<-Definiti
 {
   if(copy) {
     obj@signature = c(obj@signature, "copy")
-    obj@paramDefaults["copy"] = "TRUE"
+    obj@paramDefaults[["copy"]] = "TRUE"
   }
 
   RMethodDefinition(obj@name, class, code, obj@signature, obj@paramDefaults, obj)
@@ -154,7 +154,8 @@ setAs("RFunctionDefinition", "character",
         defaults = from@paramDefaults
 
         sig = from@signature
-        sig[ which(from@paramHasDefault) ] = paste(sig[ from@paramHasDefault ], defaults[from@paramHasDefault], sep = " = ")
+        i = which(from@paramHasDefault)
+        sig[ i ] = paste(sig[ i  ], defaults[ i ], sep = " = ")
 # Can remove this.
 #        n = length(from@signature)        
 #        values = rep("",  n)
@@ -287,7 +288,7 @@ function(code)
 }
 
 RFunctionDefinition =
-function(name, code, signature = NA, defaults = character(), obj = new("RFunctionDefinition"))
+function(name, code, signature = NA, defaults = list(), obj = new("RFunctionDefinition"))
 {
   if(is.character(obj))
     obj = new(obj)
@@ -297,8 +298,8 @@ function(name, code, signature = NA, defaults = character(), obj = new("RFunctio
   if(length(signature) == 1 && is.na(signature)) {
     els = computeSignature(code)
     obj@signature = names(els)
-    obj@paramDefaults = sapply(els, deparse)
-    obj@paramHasDefault = sapply(els, function(x) !(is.name(x) && as.character(x) == ""))
+    obj@paramDefaults = lapply(els, deparse)
+    obj@paramHasDefault = sapply(els, function(x) length(x) > 0 && !(is.name(x) && as.character(x) == ""))
 
     # Don't want to do this as it loses the original formatting.
     b = body(eval(parse(text = paste(code, collapse = "\n"))))
@@ -308,8 +309,10 @@ function(name, code, signature = NA, defaults = character(), obj = new("RFunctio
   } else
     obj@signature = as.character(signature)
 
-  if(!missing(defaults))
+  if(!missing(defaults)) {
     obj@paramDefaults = defaults
+    obj@paramHasDefault = sapply(defaults, length) > 0
+  }
 
   obj@code = formatCode(code)
   obj
