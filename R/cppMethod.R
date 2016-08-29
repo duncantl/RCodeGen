@@ -6,7 +6,7 @@ function(mdef, className = getName(getCursorLexicalParent(mdef@def)), classPrefi
           typeMap = NULL, allClassMethods = NULL)
 {
 
-  isStatic = getCursorTokens(mdef@def)[1] == "static"
+  isStatic = isStatic(mdef@def)  
   isConstructor = is(mdef, "C++ClassConstructor")
   
     # The name of the R proxy routine.

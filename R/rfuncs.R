@@ -23,7 +23,7 @@ function(fun, name = getName(fun),
           allClassMethods = NULL)
 {
       # Figure out if we have to add a this argument for a C++ method
-    isStatic = getCursorTokens(fun@def)[1] == "static"
+    isStatic =  isStatic(fun@def)  
     takesThis = !(is(fun, "C++ClassConstructor") || isStatic)
     
    if(length(libPrefix))
