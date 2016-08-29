@@ -10,7 +10,7 @@
 
 
 createMethod =
-function(fun, className, typeMap = NULL, defaultValues = character(), baseClassName = character())
+function(fun, baseClassName = getName(getParent(fun@def)), className = paste0("R", baseClassName), typeMap = NULL, defaultValues = character())
 {
    rt = fun@returnType
 
@@ -114,4 +114,38 @@ function(method, type, defaultValues = character())
       return("return(NULL)")
 
   "return()"
+}
+
+
+defineRSubclass =
+    #
+    # 
+    #
+    #
+    #
+    # Create the definition  of a C++ subclass that implements its methods using R functions 
+    # The C++ code to implement the C++ methods is generated separately.
+    # The declarations for the implemented methods are also generated separately and put in a separate header file.
+    #
+function(def, rclassName = paste0("R", getName(def)))
+{
+
+  decls = paste0("\t", sapply(def@methods, as, "character"), ";")
+  g = split(decls, sapply(def@methods, slot, "access"))
+
+  g = g[ setdiff(names(g), "private") ]
+  
+  decls = mapply(function(access, decls)
+                    c("", paste0("  ", access, ":"), decls),
+                  names(g), g)
+  
+  code = c( sprintf("class %s : public %s, public RFunctionsNativeMethods {", rclassName, getName(def)),
+            "",
+            unlist(decls),
+            "",
+            "  public",
+            sprintf("\t%s(SEXP funs) {  setFunctions(funs, true); }", rclassName),
+            "};")
+
+    code
 }
