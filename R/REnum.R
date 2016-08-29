@@ -1,3 +1,8 @@
+if(FALSE) {
+    cenums = lapply(enums, makeEnumDef)
+    renums = lapply(enums, makeEnumClass)
+}
+
 Indent = "   "
 
 enumClassName =
