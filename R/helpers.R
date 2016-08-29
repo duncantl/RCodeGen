@@ -5,7 +5,7 @@ function(def, typeMap = NULL, omit = character(), omitRX = character(), fun = cr
 
 #XXX Fix
   if(length(omit))
-     methods = methods[ setdiff(names(methods), omit) ]
+     methods = methods[ !(names(methods) %in%  omit) ]
 
   if(length(omitRX))
       methods = methods[ !grepl(omitRX, names(methods)) ]
@@ -17,7 +17,7 @@ function(def, typeMap = NULL, omit = character(), omitRX = character(), fun = cr
   methods = methods[ !i ]
 
   if(length(fun))
-     lapply(getPublic(methods), fun, typeMap = typeMap)
+     lapply(getPublic(methods), fun, typeMap = typeMap, allClassMethods = methods)
   else
       methods
 }
@@ -75,13 +75,13 @@ function(rcode)
 
    generics = sapply(funNames, mkGeneric)
 
-
    list(rcode = mapply(convertToMethods, rcode, names(rcode), MoreArgs = list(funNames = funNames)),
         generics = generics)
 }
 
 
 mkGeneric =
+    #XXX Need to get the signature correct.
 function(funName)
 {
    sprintf( 'setGeneric("%s", function(this, ...) standardGeneric("%s"))', funName, funName)
@@ -106,7 +106,7 @@ function(fun, className)
 
 
 
-defaultParamValue =
+defaultParamValueText =
 function(param)
 {
 
@@ -122,3 +122,26 @@ function(param)
    paste(toks, collapse = " ")
 }
 
+defaultParamValue =
+function(param, typeMap = NULL, value = defaultParamValueText(param))
+{
+    if(length(value) == 0)
+       return(character())
+    
+    if(value == "NULL")
+        return(NULL)
+    
+    if(grepl("^[[:space:]]*[0-9.]+[[:space:]]*$", value))
+        return(as.numeric(value))
+
+    if(grepl("g?false$", tolower(value)))
+        return(FALSE)
+
+    if(grepl("g?true$", tolower(value)))
+        return(TRUE)
+
+    if(getName(param$type) == "char *")
+       return(value)
+
+    return(character())
+}
