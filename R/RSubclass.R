@@ -10,19 +10,18 @@
 
 
 createMethod =
-function(fun, baseClassName = getName(getParent(fun@def)), className = paste0("R", baseClassName), typeMap = NULL, defaultValues = character())
+function(fun, baseClassName = getName(getParent(fun@def)), className = paste0("R", baseClassName),
+         typeMap = NULL, defaultValues = character(), addThis = FALSE)
 {
    rt = fun@returnType
 
    isVoid = ( rt$kind == CXType_Void )
 
-    # code if there is no R function.
+       # code if there is no R function.
    isPure = isPureVirtual(fun@def) # FALSE
    isStatic = isStatic(fun@def) # FALSE
-   baseName = if(isStatic)
-                 paste(baseClassName,  fun@name, sep = "::")
-              else
-                 fun@name
+   baseName = paste(baseClassName,  fun@name, sep = "::")
+   
    super =  sprintf("%s(%s)",  baseName,  paste(names(fun@params), collapse = ", "))
    noFunCode = if(isVoid & isPure)
                    "return"
@@ -37,12 +36,11 @@ function(fun, baseClassName = getName(getParent(fun@def)), className = paste0("R
    code = c( sprintf('SEXP fun = lookupRMethod("%s");', fun@name),
              "if(fun == R_NilValue) {",
                paste("  ", noFunCode, ";"),
-#               if(isVoid) "return;" else character(),
-              "}")
+             "}")
 
    params = fun@params
    if(length(names(params)) == 0 || all(names(params) == ""))
-       names(params) = LETTERS[seq(along = params) ]
+      names(params) = LETTERS[seq(along = params) ]
    numParams = length(params)
 
    body = 
@@ -50,9 +48,9 @@ function(fun, baseClassName = getName(getParent(fun@def)), className = paste0("R
            "",
            "",
            "SEXP e, cur;",
-           sprintf("PROTECT(e = cur = allocVector(LANGSXP, %d));", numParams + 1 + !isStatic),
+           sprintf("PROTECT(e = cur = allocVector(LANGSXP, %d));", (numParams + 1 + if(addThis) !isStatic else 0L)),
            "SETCAR(cur, fun); cur = CDR(cur);",
-           if(!isStatic)
+           if(addThis && !isStatic)
               sprintf('SETCAR(cur, R_createRef(this, "%s", NULL)); cur = CDR(cur);', className),
            sprintf("SETCAR(cur, %s); cur = CDR(cur);", mapply(convertCArgsToR, params, names(params), MoreArgs = list(typeMap = typeMap))),
            sprintf("%s invokeMethod(e);", if(isVoid) "" else "SEXP r_ans ="),
@@ -127,11 +125,11 @@ defineRSubclass =
     # The C++ code to implement the C++ methods is generated separately.
     # The declarations for the implemented methods are also generated separately and put in a separate header file.
     #
-function(def, rclassName = paste0("R", getName(def)))
+function(def, methods = def@methods, className = getName(def), rclassName = paste0("R", getName(def)))
 {
 
-  decls = paste0("\t", sapply(def@methods, as, "character"), ";")
-  g = split(decls, sapply(def@methods, slot, "access"))
+  decls = paste0("\t", sapply(methods, as, "character"), ";")
+  g = split(decls, sapply(methods, slot, "access"))
 
   g = g[ setdiff(names(g), "private") ]
   
@@ -139,11 +137,13 @@ function(def, rclassName = paste0("R", getName(def)))
                     c("", paste0("  ", access, ":"), decls),
                   names(g), g)
   
-  code = c( sprintf("class %s : public %s, public RFunctionsNativeMethods {", rclassName, getName(def)),
+  code = c( '#include "RFunctionsNativeMethods.h"',
+            "",
+            sprintf("class %s : public %s, public RFunctionsNativeMethods {", rclassName, getName(def)),
             "",
             unlist(decls),
             "",
-            "  public",
+            "  public:",
             sprintf("\t%s(SEXP funs) {  setFunctions(funs, true); }", rclassName),
             "};")
 
