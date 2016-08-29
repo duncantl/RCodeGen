@@ -159,10 +159,11 @@ function(param, inputName,  localName = getName(param), type = getType(param),
      ans = getConvertRValue(type, localName, inputName, decl, kind, GetRefAddsStar = GetRefAddsStar, typeMap = typeMap, cast = cast)
 
 
-   if(length(ans) == 0 || ans == "") {
-     browser()
-      warning("possible problem ", decl)
-    }
+   
+   if(length(ans) == 0 || ans == "")
+         # XXX Merge these two functions - this one and getConvertRValue()
+      decl = getConvertRValue(type, localName, inputName, decl, kind, GetRefAddsStar, typeMap = typeMap, cast = cast)
+
 
    if(addDecl)
      paste(decl, ans)
@@ -276,7 +277,7 @@ function(varName, type, addSemiColon = TRUE, const = FALSE, typeMap = NULL, from
 
 
 convertRValue =
-function(localName, rName, type, typeMap = NULL, cast = character())
+function(localName, rName, type, typeMap = NULL, cast = "")
 {
   makeLocalVar(, rName, localName, type = type, typeMap = typeMap, addDecl = FALSE, cast = cast)
 }
