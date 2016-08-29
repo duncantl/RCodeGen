@@ -17,23 +17,34 @@ function(fun, name = getName(fun),
           params = fun@params,
           argNames = names(params),
           returnType = fun@returnType,
-          nativeProxyName = sprintf("R_%s", name),
+          nativeProxyName = getNativeProxyName(fun, name, classMethods = allClassMethods),
           PACKAGE = NA, defaultValues = character(), guessDefaults = FALSE,
-          typeMap = NULL, libPrefix = "clang_")
+          typeMap = NULL, libPrefix = "clang_",
+          allClassMethods = NULL)
 {
+      # Figure out if we have to add a this argument for a C++ method
+    isStatic = getCursorTokens(fun@def)[1] == "static"
+    takesThis = !(is(fun, "C++ClassConstructor") || isStatic)
     
    if(length(libPrefix))
       name = gsub(sprintf("^%s", libPrefix), "", name)
-  
+
+      # If missing parameter names, add them now.
    if(any(w <- (argNames == ""))) 
       argNames[w] = sprintf("arg%d", which(w))
-  
-   coercedArgs = makeCoercedArgs(params, argNames)
-   if(is(fun, "C++ClassMethod")) {
+
+
+      # Generate the code for the body of the function that coerces the arguments to the correct types.
+   coercedArgs = makeCoercedArgs(params, argNames, typeMap = typeMap)
+
+
+      # Add a this to the parameters and coercion to the correct type if we need a this.
+   if(takesThis) {
       coercedArgs = c(sprintf("as(this, '%s')", fun@className), coercedArgs)
       argNames = c("this", argNames)
    }
-   
+
+      #  Generate the call to the C routine.
    call = c(sprintf(".Call('%s'",  nativeProxyName),
              if(length(coercedArgs)) ", ", 
              paste(c(coercedArgs, if(!is.na(PACKAGE)) c(PACKAGE = PACKAGE)), collapse = ", "),
@@ -43,9 +54,10 @@ function(fun, name = getName(fun),
 #   sig = makeSignature(argNames, fun@params, defaultValues, guessDefaults)
 
    rt = returnType
-   if(FALSE && length(fun$actualReturnType))
-      rt = fun$actualReturnType
+#   if(FALSE && length(fun$actualReturnType))
+#      rt = fun$actualReturnType
 
+       # Coerce the result back to R. Should probably be already done in C but a second chance.
    map = lookupTypeMap(typeMap, getName(rt), "RcoerceResult", rt, name = "ans")   
    
    code = c(#paste(name, "<-"),
@@ -55,10 +67,47 @@ function(fun, name = getName(fun),
             map
            # "}"
           )
+    
+   defaultVals = lapply(params, defaultParamValue)
+   if(takesThis) {
+       tmp = defaultVals
+       defaultVals = list(character())
+       defaultVals[seq(along = tmp) + 1] = tmp
+   }
 
-   RFunctionDefinition(name, code, argNames)
+   RFunctionDefinition(name, code, argNames, defaults = defaultVals)
 }
 
+getNativeProxyName =
+    #
+    # Connect this to 
+    #
+function(fun, name = getName(fun), isOverloaded = sum(name == names(classMethods)) > 1, classMethods = NULL)
+{
+  if(is(fun, "AbstractC++ClassStaticMethod")) {
+    if(isOverloaded)
+       sprintf("R_%s_%s%s", fun@className, name, getParamSig(fun@params))
+    else
+       sprintf("R_%s_%s", fun@className, name)     
+  } else
+    sprintf("R_%s", name)
+}
+
+
+getParamSig =
+function(params)
+{
+  if(length(params))
+     paste(sapply(params, function(x)  mangleType(getType(x))), collapse = "_")
+  else
+     ""
+}
+
+mangleType =
+function(type, typeName = getName(type))
+{
+   gsub(" ", "_",  gsub("\\*", "Ptr", typeName))
+}
 
 
 createRMethodProxy =
@@ -84,9 +133,9 @@ function(argNames, params, defaultValues = character(), guessDefaults = !inherit
 }
   
 makeCoercedArgs =
-function(params, names)
+function(params, names, typeMap = NULL)
 {
-  unlist(mapply(makeCoerceArg, params, names))
+  unlist(mapply(makeCoerceArg, params, names, MoreArgs = list(typeMap = typeMap)))
 }
 
 
@@ -106,10 +155,21 @@ function(kind)
 
 
 makeCoerceArg =
-function(parm, name, type = getType(parm), kind = getTypeKind(type))
+    #
+    # parm is the CXCursor for the parameter declaration
+    # name  parameter name
+    # 
+    #
+function(parm, name, type = getType(parm), kind = getTypeKind(type), typeMap = NULL)
 {
 
-    class = getBuiltinRTypeFromKind(kind)
+   if(length(typeMap)) {
+      ans = lookupTypeMap(typeMap, getName(type), "coerceRParam", type, name)
+      if(length(ans) && nchar(ans) > 0)
+        return(ans)
+   }
+    
+   class = getBuiltinRTypeFromKind(kind)
 
    if(length(class) == 0) {
      typeName = getName(type)
