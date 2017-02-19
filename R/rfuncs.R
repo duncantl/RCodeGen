@@ -10,7 +10,7 @@ createRProxy =
     # to call an actual routine. This coerces its arguments to the appropriate
     # R type and then uses .Call() to invoke the proxy C routine.
     #
-    #  We've added new parameters so anthing calling this (code in CUDA, RCIndex but not in the NAMESPACE)
+    #  We've added new parameters so anything calling this (code in CUDA, RCIndex but not in the NAMESPACE)
     #
     #
 function(fun, name = getName(fun),
@@ -20,19 +20,31 @@ function(fun, name = getName(fun),
           nativeProxyName = getNativeProxyName(fun, name, classMethods = allClassMethods),
           PACKAGE = NA, defaultValues = character(), guessDefaults = FALSE,
           typeMap = NULL, libPrefix = "clang_",
-          allClassMethods = NULL)
+          allClassMethods = NULL,
+          generics = list())
 {
       # Figure out if we have to add a this argument for a C++ method
-    isStatic =  isStatic(fun@def)  
-    takesThis = !(is(fun, "C++ClassConstructor") || isStatic)
+    isStatic = isStatic(fun@def)  
+    takesThis = is(fun, "C++MethodDefinition") && !(is(fun, "C++ClassConstructor") || isStatic)
+
+
     
-   if(length(libPrefix))
-      name = gsub(sprintf("^%s", libPrefix), "", name)
+    if(length(libPrefix))
+        name = gsub(sprintf("^%s", libPrefix), "", name)
 
       # If missing parameter names, add them now.
-   if(any(w <- (argNames == ""))) 
-      argNames[w] = sprintf("arg%d", which(w))
+    if(any(w <- (argNames == ""))) 
+        argNames[w] = sprintf("arg%d", which(w))
 
+    hasGeneric = (length(generics) && name %in% names(generics))
+    if(hasGeneric) {
+        generic = generics[[ name ]]    
+        argNames = names(formals(generic))
+        if(is(fun, 'C++ClassMethod') && argNames[1] == 'this')
+           argNames = argNames[-1]
+
+        argNames = argNames[seq(along = params)]
+    }
 
       # Generate the code for the body of the function that coerces the arguments to the correct types.
    coercedArgs = makeCoercedArgs(params, argNames, typeMap = typeMap)
@@ -75,7 +87,16 @@ function(fun, name = getName(fun),
        defaultVals[seq(along = tmp) + 1] = tmp
    }
 
-   RFunctionDefinition(name, code, argNames, defaults = defaultVals)
+
+   if(hasGeneric) {
+#if(name == "copy") browser()
+
+# Get the missings in here also
+      dispatch = if(length(params) == 0) fun@className else c(fun@className, sapply(params, makeCoerceArg, typeMap = typeMap))
+      sig = ""
+      RMethodDefinition(name, dispatch, code, sig, defaults = defaultVals)
+   } else
+      RFunctionDefinition(name, code, argNames, defaults = defaultVals)
 }
 
 getNativeProxyName =
@@ -160,7 +181,7 @@ makeCoerceArg =
     # name  parameter name
     # 
     #
-function(parm, name, type = getType(parm), kind = getTypeKind(type), typeMap = NULL)
+function(parm, name = character(), type = getType(parm), kind = getTypeKind(type), typeMap = NULL)
 {
 
    if(length(typeMap)) {
@@ -219,5 +240,8 @@ function(parm, name, type = getType(parm), kind = getTypeKind(type), typeMap = N
      }
    }
 
+   if(length(name) == 0 || is.na(name))
+       return(class)
+   
    sprintf("as(%s, '%s')", name, gsub("const ", "", class))
 }
