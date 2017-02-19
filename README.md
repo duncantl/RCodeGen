@@ -29,5 +29,6 @@ examples. See
 * [RGraphicsDevice](http://github.com/omegahat/RGraphicsDevice), 
 * [RCIndex](http://github.com/omegahat/RClangSimple.git) (named RClangSimple on github), and
 * [RCUDA](http://github.com/duncantl/RCUDA.git)
+* [Rrawpoppler](http://github.com/dsidavis/Rrawpoppler.git)
 packages. See the TU/ directories in those packages.
 
