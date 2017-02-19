@@ -1,5 +1,5 @@
 genClassCode =
-function(def, typeMap = NULL, omit = character(), omitRX = character(), fun = createCppMethod)
+function(def, typeMap = NULL, omit = character(), omitRX = character(), fun = createCppMethod, ...)
 {
   methods = def@methods[! sapply(def@methods, is, "C++ClassConstructor") ]
 
@@ -17,7 +17,7 @@ function(def, typeMap = NULL, omit = character(), omitRX = character(), fun = cr
   methods = methods[ !i ]
 
   if(length(fun))
-     lapply(getPublic(methods), fun, typeMap = typeMap, allClassMethods = methods)
+     lapply(getPublic(methods), fun, typeMap = typeMap, allClassMethods = methods, ...)
   else
       methods
 }
@@ -65,14 +65,16 @@ mkRGenericMethods =
     # We convert each of the overloaded functions into methods and generate generics
     #
     # Assumes names are on the rcode object identifying the classes
-function(rcode)
+function(rcode, funNames = NULL)
 {
-   tt = sort(table(unlist(lapply(rcode, names))))
-   funNames = names(tt)[tt > 1]
+   if(missing(funNames) || is.null(funNames)) {
+     tt = sort(table(unlist(lapply(rcode, names))))
+     funNames = names(tt)[tt > 1]
+   }
 
    if(length(funNames) == 0)
        return(rcode)
-
+   
    generics = sapply(funNames, mkGeneric)
 
    list(rcode = mapply(convertToMethods, rcode, names(rcode), MoreArgs = list(funNames = funNames)),
