@@ -310,8 +310,14 @@ function(name, code, signature = NA, defaults = list(), obj = new("RFunctionDefi
     obj@signature = as.character(signature)
 
   if(!missing(defaults)) {
-    obj@paramDefaults = defaults
-    obj@paramHasDefault = sapply(defaults, length) > 0
+     if(length(defaults) < length(obj@signature)  ) {
+        tmp = vector("list", length(obj@signature))
+        names(tmp) = obj@signature
+        tmp[names(defaults)] = defaults
+        defaults = tmp
+     }
+     obj@paramDefaults = as.list(defaults)
+     obj@paramHasDefault = sapply(defaults, length) > 0
   }
 
   obj@code = formatCode(code)
