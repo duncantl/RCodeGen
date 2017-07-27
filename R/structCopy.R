@@ -125,7 +125,7 @@ function(type)
 generateStructCreation =
 function(type, name = type@name, alloc = "calloc", addFinalizer = TRUE)
 {
-  decl = getNativeDeclaration("", type, character(), FALSE)
+  decl = getNativeDeclaration("", type, addSemiColon = FALSE)
   rname = paste("R_new_", name, sep = "")
   txt = 
    c(externC,
@@ -162,7 +162,6 @@ function(type, name = type@name, alloc = "calloc", addFinalizer = TRUE)
            "",
            "ans"
           )
-
 
 
   structure(list(c = cdef,
