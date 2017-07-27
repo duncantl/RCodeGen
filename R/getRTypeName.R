@@ -1,7 +1,6 @@
 getRTypeName = 
 function(type, kind = getTypeKind(type), name = getName(type), typeMap = NULL)
 {
-
   if(!is.null(typeMap) && !is.null(map <- typeMap[[name]])) {
     tmp =  map[["rclass"]]
     if(!is.null(tmp))
@@ -14,7 +13,7 @@ function(type, kind = getTypeKind(type), name = getName(type), typeMap = NULL)
     tmp = getRTypeName(getElementType(type), typeMap = typeMap)
   } else if(kind == CXType_Typedef) {
     getName(type)
-  } else if(kind == CXType_Double || kind == CXType_Float)
+  } else if(kind == CXType_Double || kind == CXType_Float || kind == CXType_Long)
     "numeric"
   else if(kind %in% c(CXType_Int, CXType_Char16, CXType_Char32))
    "integer"
@@ -29,7 +28,9 @@ function(type, kind = getTypeKind(type), name = getName(type), typeMap = NULL)
  
   } else if(kind == CXType_Enum) {
      enumClassName(name = gsub("enum ", "", name))
-  } else {
+ }  else if(kind == RCIndex:::CXType_Elaborated) {
+     gsub("struct ", "", name)
+ } else {
      stop("don't know the R type for this native type!")
   }
 }
