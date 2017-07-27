@@ -1,7 +1,7 @@
 
 makeStructCode =
   # handle different inputs, i.e. not the StructDescription, but CXType, CXCursor
-function(desc, name = desc$name[1], isOpaque = FALSE, typeMap = NULL)
+function(desc, name = desc@name[1], isOpaque = FALSE, typeMap = NULL)
 {
    # generate  a class for both the Struct represented in R
    # and a C pointer to an instance.
@@ -27,26 +27,25 @@ function(desc, name = desc$name[1], isOpaque = FALSE, typeMap = NULL)
 
    list(r = makeRStructCode(desc, name, isOpaque, typeMap),
         native = makeCStructCode(desc, name, isOpaque, typeMap))
-
 }
 
 
 makeRStructCode = 
-function(desc, name = desc$name[1], isOpaque = FALSE, typeMap = NULL)
+function(desc, name = desc@name[1], isOpaque = FALSE, typeMap = NULL)
 {
-   fieldDefs = lapply(desc$fields, getRTypeName, typeMap = typeMap)
+   fieldDefs = lapply(desc@fields, getRTypeName, typeMap = typeMap)
    classDef = sprintf("setClass('%s', representation(%s))",
-                        name, paste(names(fieldDefs), sQuote(fieldDefs), sep = " = ", collapse = ", "))
+                       name, paste(names(fieldDefs), sQuote(fieldDefs), sep = " = ", collapse = ", "))
 
 
    ptrClassDef = sprintf("setClass('%sPtr', contains = 'RC++StructReference')", name)
    
    list(classDef= classDef,
         ptrClassDef = ptrClassDef,
-        getMethod =  makeRStructMethod(desc$fields, name),
-        setMethod =  makeRStructMethod(desc$fields, name, FALSE),        
+        getMethod =  makeRStructMethod(desc@fields, name),
+        setMethod =  makeRStructMethod(desc@fields, name, FALSE),        
         constructor = makeRConstructor(desc, name),
-        namesMethod = makeNamesMethod(desc, desc$fields, name))
+        namesMethod = makeNamesMethod(desc, desc@fields, name))
 }
 
 makeFieldAccessorRoutineName =
@@ -75,16 +74,16 @@ function(desc, name, get = TRUE, ops = if(get) c("get", "$") else c("set", "$<-"
 
 
 makeRConstructor =
-function(desc, name = desc$name[1])
+function(desc, name = desc@name[1], fields = desc@fields)
 {
    if(is(desc, "CXCursor"))
       desc = getStructDef(desc)
    
    coerceCode = mapply(function(f, id)
                          makeCoerceArg(name = id, type= f),
-                        desc$fields, names(desc$fields))
+                         fields, names(fields))
    set = sprintf("if(!missing(%s))\n       .ans@%s = %s",
-                     names(desc$fields), names(desc$fields),
+                     names(fields), names(fields),
                       coerceCode)
  
   
@@ -95,16 +94,16 @@ function(desc, name = desc$name[1])
             "",
             ".ans")
      
-    RFunctionDefinition(name, code, c(names(desc$fields), ".ans"), defaults = c(.ans = sprintf("new('%s')", name)))
+    RFunctionDefinition(name, code, c(names(fields), ".ans"), defaults = list(.ans = sprintf("new('%s')", name)))
 }
 
 
 makeCStructCode =
-function(desc, name, isOpaque, typeMap = NULL)
+function(desc, name = desc@name[1], isOpaque = FALSE, typeMap = NULL, fields = desc@fields)
 {
      # $ method
-  list(getAccessors = mapply(makeCStructFieldAccessor, names(desc$fields), desc$fields, name, MoreArgs = list(typeMap = typeMap)),
-       setAccessors = mapply(makeCStructFieldAccessor, names(desc$fields), desc$fields, name, MoreArgs = list(get = FALSE, typeMap = typeMap)))       
+  list(getAccessors = mapply(makeCStructFieldAccessor, names(fields), fields, name, MoreArgs = list(typeMap = typeMap)),
+       setAccessors = mapply(makeCStructFieldAccessor, names(fields), fields, name, MoreArgs = list(get = FALSE, typeMap = typeMap)))       
        
 
 }
@@ -191,7 +190,7 @@ makeNamesMethod =
 function(desc, fields = desc$fields, name = desc$name[1])
 {
 
-   code = c("setMethod('names', '%s',\nfunction(x)\n c(%s))" ,
+   code = sprintf("setMethod('names', '%s',\nfunction(x)\n c(%s))" ,
                  name,
                  paste(sQuote(names(fields)), collapse = ", "))
  
