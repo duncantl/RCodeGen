@@ -3,6 +3,9 @@
 # initialize  return value to something sensible.
 # R_createRef() call should not have the struct
 #
+#
+# XXXX see createRProxy().  Probably remove createProxyRCall().
+
 createProxyRCall =
   #
   # func = FunctionPointer
