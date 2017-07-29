@@ -29,46 +29,80 @@ function(desc, name = desc@name[1], isOpaque = FALSE, typeMap = NULL)
         native = makeCStructCode(desc, name, isOpaque, typeMap))
 }
 
+getPtrClassName =
+function(name)
+  sprintf("%sPtr", gsub(" ", "_", gsub("struct ", "", name))    )
+
 
 makeRStructCode = 
-function(desc, name = desc@name[1], isOpaque = FALSE, typeMap = NULL, ptrClassName = sprintf("%sPtr", name))
+function(desc, name = desc@name[1], isOpaque = FALSE, typeMap = NULL, ptrClassName = getPtrClassName(name))
 {
+   cName = name
+   rname = gsub("struct ", "", name)
    fieldDefs = lapply(desc@fields, getRTypeName, typeMap = typeMap)
    classDef = sprintf("setClass('%s', representation(%s))",
-                       name, paste(names(fieldDefs), sQuote(fieldDefs), sep = " = ", collapse = ", "))
+                       rname, paste(names(fieldDefs), sQuote(fieldDefs), sep = " = ", collapse = ", "))
 
    ptrClassDef = sprintf("setClass('%s', contains = 'RC++StructReference')", ptrClassName)
    
    list(classDef= classDef,
         ptrClassDef = ptrClassDef,
-        getMethod =  makeRStructMethod(desc@fields, name),
-        setMethod =  makeRStructMethod(desc@fields, name, FALSE),        
-        constructor = makeRConstructor(desc, name),
-        namesMethod = makeNamesMethod(desc, desc@fields, ptrClassName))
+        getMethod =  c(makeRStructMethod(desc@fields, ptrClassName, cName),
+                       makeRStructMethod(desc@fields, ptrClassName, cName, ops = c("get", "[["))),
+        setMethod =  c(makeRStructMethod(desc@fields, ptrClassName, cName, FALSE,),
+                       makeRStructMethod(desc@fields, ptrClassName, cName, FALSE, c("set", "[[<-"))),    
+        constructor = makeRConstructor(desc, rname),
+        refConstructor = rRefConstructor(desc, rname, cName),
+        namesMethod = makeNamesMethod(desc, desc@fields, ptrClassName),
+        coercePtr = coerceStructToR(desc, rname, ptrClassName),
+        coerceToR = coerceRToStruct(desc, rname, ptrClassName)
+       )
 }
+
+coerceStructToR =
+function(desc, rname, cname)
+{
+    sprintf("setAs('%s', '%s', function(from) .Call('%s', from))", cname, rname,
+            getStructCopyRoutineName(desc@def))
+}
+
+coerceRToStruct =
+function(desc, rname, cname, fields = desc@fields)
+{
+    # Perhaps for speed we should do this in C but leave that until later.
+    code = c(sprintf("function(from, to = %s())", getPtrClassName(rname)),
+             "{",
+              sapply(names(fields),
+                      function(x) sprintf("to$%s = from@%s", x, x)),
+             "to",
+             "}")
+    sprintf("setAs('%s', '%s', %s)", rname, cname, paste(code, collapse = "\n"))
+}
+
 
 makeFieldAccessorRoutineName =
 function(name, op = "get")
-   sprintf("R_%s_%s", name, op)  
+   sprintf("R_%s_%s", gsub(" ", "_", name), op)  
 
 makeFieldMethod =
-function(desc, name, op = "get")
+function(desc, rname, cname, op = "get")
 {
   code = c(sprintf(".fieldNames = c(%s)", paste(sQuote(names(desc)), collapse = ", ")),
            "if(is.na( i <- pmatch(name, .fieldNames)))",
-           sprintf("    stop(name, ' is not a field name for', '%s')", name),
+           sprintf("    stop(name, ' is not a field name for', '%s')", rname),
            sprintf(".Call(sprintf('%s_%%s', .fieldNames[i]), x %s)",
-                        makeFieldAccessorRoutineName(name, op),
-                        if(op == "get") "" else ", value")
+                        makeFieldAccessorRoutineName(cname, op),
+                   if(op == "get") "" else ", value"),
+           if(op != "get") "x"
         )
 }
 
 makeRStructMethod =
-function(desc, name, get = TRUE, ops = if(get) c("get", "$") else c("set", "$<-"))
+function(desc, rname, cname, get = TRUE, ops = if(get) c("get", "$") else c("set", "$<-"))
 {
-  fun = RFunctionDefinition(character(), makeFieldMethod(desc, name, ops[1]), c("x", "name", if(!get) "value"))
+  fun = RFunctionDefinition(character(), makeFieldMethod(desc, rname, cname, ops[1]), c("x", "name", if(!get) "value"))
   sprintf("setMethod('%s', '%s',\n %s\n)\n",
-            ops[2L], name, as(fun, "character"))
+            ops[2L], rname, as(fun, "character"))
 }
 
 
@@ -100,25 +134,31 @@ function(desc, name = desc@name[1], fields = desc@fields)
 makeCStructCode =
 function(desc, name = desc@name[1], isOpaque = FALSE, typeMap = NULL, fields = desc@fields)
 {
+    rname = gsub(" ", "_", name)
+    rclassName = gsub("struct ", "", name)
      # $ method
   list(getAccessors = mapply(makeCStructFieldAccessor, names(fields), fields, name, MoreArgs = list(typeMap = typeMap)),
        setAccessors = mapply(makeCStructFieldAccessor, names(fields), fields, name, MoreArgs = list(get = FALSE, typeMap = typeMap)),
-       copyToR = makeCCopyStructCode(desc),
+       copyToR = makeCCopyStructCode(desc, rclassName),
        alloc = makeAllocStruct(desc, name)
       )       
 }
 
+allocRoutineName =
+function(name)
+  sprintf("R_alloc_%s", gsub(" ", "_", name))
+
 makeAllocStruct =
-function(desc, name = desc@name[1])
+function(desc, name = desc@name[1], cName = desc@name[1])
 {
-  fnName = sprintf("R_alloc_%s", name)
+  fnName = allocRoutineName(name)
   k = c("SEXP",
         paste0(fnName, "(int addFinalizer)"),
         "{",
          "void *ptr = NULL;",
-         sprintf("ptr = calloc(1, sizeof(%s));", name),
+         sprintf("ptr = calloc(1, sizeof(%s));", cName),
          "if(!ptr) {",
-         sprintf('   PROBLEM "cannot allocate %%lu bytes for a \\"%s\\"", sizeof(%s)\n\tERROR;', name, name),
+         sprintf('   PROBLEM "cannot allocate %%lu bytes for a \\"%s\\"", sizeof(%s)\n\tERROR;', cName, name),
          "}",
          "SEXP ans;",
          sprintf('ans = R_MakeExternalPtr(ptr, Rf_install("%s"), R_NilValue);', name),
@@ -130,6 +170,24 @@ function(desc, name = desc@name[1])
 
    CRoutineDefinition(fnName, k)  
 }
+
+rRefConstructor =
+function(desc, name = desc@name[1], structName = desc@name[1])
+{    
+    fnName = allocRoutineName(structName)
+    
+    code = c(sprintf(".ans = .Call('%s', as.logical(.addFinalizer))", fnName),
+             sprintf(".ans = new('%s', ref = .ans)", getPtrClassName(name)),
+             ".args = list(...)",
+             "mapply(function(var, val)
+                       `[[<-`(.ans, var, val),
+                     names(.args), .args)",
+             ".ans"
+            )
+
+    RFunctionDefinition(getPtrClassName(name), code, c("...", ".addFinalizer"), defaults = list(".addFinalizer" = TRUE))
+}
+
 
 makeCStructFieldAccessor =
 function(fieldName, type, structName, get = TRUE, typeMap = NULL)
@@ -171,7 +229,7 @@ makeCCopyStructCode =
     #  This generates code to return a list.
     #  Why does it not set the slots of an S4 object.
     #
-function(desc, funName = getStructCopyRoutineName(desc@def), typeMap = NULL)
+function(desc, rname, funName = getStructCopyRoutineName(desc@def), typeMap = NULL, s4 = TRUE)
 {
   force(funName)   # if given a TypeDefinition, use its name and then get the Struct info.
   
@@ -180,7 +238,10 @@ function(desc, funName = getStructCopyRoutineName(desc@def), typeMap = NULL)
 
   copyFields =  mapply(function(f, name) {
                           v = convertValueToR(f, sprintf("obj->%s", name), typeMap = typeMap)
-                          v[length(v)] = sprintf('SET_VECTOR_ELT(r_ans, i, %s);', gsub(";$", "", v))
+                          v[length(v)] = if(s4)
+                                            sprintf('SET_SLOT(r_ans, Rf_install("%s"), %s);', name, gsub(";$", "", v))                             
+                                         else 
+                                            sprintf('SET_VECTOR_ELT(r_ans, i, %s);', gsub(";$", "", v))
                           a = if(length(v) > 1) 
                                c("{",
                                  v,
@@ -188,12 +249,28 @@ function(desc, funName = getStructCopyRoutineName(desc@def), typeMap = NULL)
                                 else
                                  v
 
-                            c(a, sprintf('SET_STRING_ELT(r_names, i++, Rf_mkChar("%s"));', name))
+                          if(s4)
+                              a
+                          else
+                              c(a, sprintf('SET_STRING_ELT(r_names, i++, Rf_mkChar("%s"));', name))
                        },
                        desc@fields, names(desc@fields))
   nfields = length(desc@fields)
   sig = sprintf("%s(%s *obj)", funName, getName(getCanonicalType(desc@def)))
-  code = c("SEXP",
+
+  code = if(s4) 
+          c("SEXP",
+            sig,
+            "{",
+            "SEXP r_ans, r_class;",
+            sprintf('PROTECT(r_class = MAKE_CLASS("%s"));', rname),
+            'PROTECT(r_ans = NEW_OBJECT(r_class));',            
+            unlist(copyFields),
+            "UNPROTECT(2);",
+            "return(r_ans);",            
+            "}")
+         else
+          c("SEXP",
             sig,
            "{",
            "int i = 0;",
