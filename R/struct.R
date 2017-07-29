@@ -20,7 +20,7 @@ function(desc, name = desc@name[1], isOpaque = FALSE, typeMap = NULL)
   
    # For the R version,
    #   + define a class with a slot for each field
-   #   +  a constructor function
+   #   + a constructor function
    #
    # 
    #     
@@ -31,21 +31,20 @@ function(desc, name = desc@name[1], isOpaque = FALSE, typeMap = NULL)
 
 
 makeRStructCode = 
-function(desc, name = desc@name[1], isOpaque = FALSE, typeMap = NULL)
+function(desc, name = desc@name[1], isOpaque = FALSE, typeMap = NULL, ptrClassName = sprintf("%sPtr", name))
 {
    fieldDefs = lapply(desc@fields, getRTypeName, typeMap = typeMap)
    classDef = sprintf("setClass('%s', representation(%s))",
                        name, paste(names(fieldDefs), sQuote(fieldDefs), sep = " = ", collapse = ", "))
 
-
-   ptrClassDef = sprintf("setClass('%sPtr', contains = 'RC++StructReference')", name)
+   ptrClassDef = sprintf("setClass('%s', contains = 'RC++StructReference')", ptrClassName)
    
    list(classDef= classDef,
         ptrClassDef = ptrClassDef,
         getMethod =  makeRStructMethod(desc@fields, name),
         setMethod =  makeRStructMethod(desc@fields, name, FALSE),        
         constructor = makeRConstructor(desc, name),
-        namesMethod = makeNamesMethod(desc, desc@fields, name))
+        namesMethod = makeNamesMethod(desc, desc@fields, ptrClassName))
 }
 
 makeFieldAccessorRoutineName =
@@ -103,9 +102,33 @@ function(desc, name = desc@name[1], isOpaque = FALSE, typeMap = NULL, fields = d
 {
      # $ method
   list(getAccessors = mapply(makeCStructFieldAccessor, names(fields), fields, name, MoreArgs = list(typeMap = typeMap)),
-       setAccessors = mapply(makeCStructFieldAccessor, names(fields), fields, name, MoreArgs = list(get = FALSE, typeMap = typeMap)))       
-       
+       setAccessors = mapply(makeCStructFieldAccessor, names(fields), fields, name, MoreArgs = list(get = FALSE, typeMap = typeMap)),
+       copyToR = makeCCopyStructCode(desc),
+       alloc = makeAllocStruct(desc, name)
+      )       
+}
 
+makeAllocStruct =
+function(desc, name = desc@name[1])
+{
+  fnName = sprintf("R_alloc_%s", name)
+  k = c("SEXP",
+        paste0(fnName, "(int addFinalizer)"),
+        "{",
+         "void *ptr = NULL;",
+         sprintf("ptr = calloc(1, sizeof(%s));", name),
+         "if(!ptr) {",
+         sprintf('   PROBLEM "cannot allocate %%lu bytes for a \\"%s\\"", sizeof(%s)\n\tERROR;', name, name),
+         "}",
+         "SEXP ans;",
+         sprintf('ans = R_MakeExternalPtr(ptr, Rf_install("%s"), R_NilValue);', name),
+         "PROTECT(ans);",
+         "R_RegisterCFinalizer(ans, SimpleAllocFinalizer);",
+         "UNPROTECT(1);",
+         "return(ans);",
+      "}")
+
+   CRoutineDefinition(fnName, k)  
 }
 
 makeCStructFieldAccessor =
@@ -144,6 +167,10 @@ function(fieldName, type, structName, get = TRUE, typeMap = NULL)
 
 
 makeCCopyStructCode =
+    #
+    #  This generates code to return a list.
+    #  Why does it not set the slots of an S4 object.
+    #
 function(desc, funName = getStructCopyRoutineName(desc@def), typeMap = NULL)
 {
   force(funName)   # if given a TypeDefinition, use its name and then get the Struct info.
@@ -187,7 +214,7 @@ function(desc, funName = getStructCopyRoutineName(desc@def), typeMap = NULL)
 
 
 makeNamesMethod =
-function(desc, fields = desc$fields, name = desc$name[1])
+function(desc, fields = desc@fields, name = desc@name[1])
 {
 
    code = sprintf("setMethod('names', '%s',\nfunction(x)\n c(%s))" ,
