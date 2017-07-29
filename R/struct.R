@@ -100,8 +100,16 @@ function(desc, rname, cname, op = "get")
 makeRStructMethod =
 function(desc, rname, cname, get = TRUE, ops = if(get) c("get", "$") else c("set", "$<-"))
 {
-  fun = RFunctionDefinition(character(), makeFieldMethod(desc, rname, cname, ops[1]), c("x", "name", if(!get) "value"))
-  sprintf("setMethod('%s', '%s',\n %s\n)\n",
+    code = makeFieldMethod(desc, rname, cname, ops[1])
+    if(substring(ops[2], 1, 2) == "[[")
+        code = c("name = i", code)
+    fun = RFunctionDefinition(character(), code, c("x", "name", if(!get) "value"))
+    if(ops[2] == "[[<-") {
+       fun@signature = c("x", "i", "j", "...", "value")
+    } else if(ops[2] == "[[")
+       fun@signature = c("x", "i", "j", "...")
+    
+    sprintf("setMethod('%s', '%s',\n %s\n)\n",
             ops[2L], rname, as(fun, "character"))
 }
 
@@ -180,7 +188,7 @@ function(desc, name = desc@name[1], structName = desc@name[1])
              sprintf(".ans = new('%s', ref = .ans)", getPtrClassName(name)),
              ".args = list(...)",
              "mapply(function(var, val)
-                       `[[<-`(.ans, var, val),
+                       .ans[[var]] = val,
                      names(.args), .args)",
              ".ans"
             )
@@ -227,7 +235,7 @@ function(fieldName, type, structName, get = TRUE, typeMap = NULL)
 makeCCopyStructCode =
     #
     #  This generates code to return a list.
-    #  Why does it not set the slots of an S4 object.
+    #  Why does it not set the slots of an S4 object. Does now.
     #
 function(desc, rname, funName = getStructCopyRoutineName(desc@def), typeMap = NULL, s4 = TRUE)
 {
@@ -256,7 +264,8 @@ function(desc, rname, funName = getStructCopyRoutineName(desc@def), typeMap = NU
                        },
                        desc@fields, names(desc@fields))
   nfields = length(desc@fields)
-  sig = sprintf("%s(%s *obj)", funName, getName(getCanonicalType(desc@def)))
+  ifunName = gsub("^R_", "Ri_", funName)
+  sig = sprintf("%s(%s *obj)", ifunName, getName(getCanonicalType(desc@def)))
 
   code = if(s4) 
           c("SEXP",
@@ -284,8 +293,13 @@ function(desc, rname, funName = getStructCopyRoutineName(desc@def), typeMap = NU
            "}")
   
 
-  
-  CRoutineDefinition(funName, code)
+  code2 = c("SEXP",
+            sprintf("%s(SEXP r_obj)", funName),
+            "{",
+              sprintf("return(%s(GET_REF(r_obj, %s)));", ifunName,  getName(getCanonicalType(desc@def))),
+            "}")
+  list(internal = CRoutineDefinition(ifunName, code),
+       r = CRoutineDefinition(funName, code2))
 }
 
 
