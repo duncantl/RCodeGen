@@ -50,7 +50,8 @@ makeEnumClass =
     # Generate the setClass(), setAs() methods and the Values and individual variables.
     # i.e. the whole thing.
     #
-function(def, name = enumClassName(def), bitwise = FALSE, superClass = if(bitwise) "BitwiseValue" else "EnumValue", prefix = NA)
+    function(def, name = enumClassName(def), bitwise = FALSE, superClass = if(bitwise) "BitwiseValue" else "EnumValue",
+             prefix = getLongestStartingCommonSubstring(names(def@values)))
 {
   classDef = sprintf('setClass("%s", contains = "%s")', name, superClass)
 
