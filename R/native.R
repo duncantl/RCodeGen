@@ -117,7 +117,8 @@ function(type, var, name = getName(type), typeMap = NULL, rvar = "r_ans")
       len = getNumElements(type)
       elTypeName = capitalize(getName(el))
       sprintf("convert%sArrayToR(%s, %d, 0, %d)", elTypeName, var, len, len - 1L)
-
+   } else if(k == RCIndex:::CXType_Elaborated) {
+      sprintf("%s(%s)", getStructCopyRoutineName(type), var)
    } else {
           # may be a const type &
       name = gsub("^const ", "", name)
