@@ -28,7 +28,6 @@ function(fun, name = getName(fun),
     takesThis = is(fun, "C++MethodDefinition") && !(is(fun, "C++ClassConstructor") || isStatic)
 
 
-    
     if(length(libPrefix))
         name = gsub(sprintf("^%s", libPrefix), "", name)
 
@@ -213,7 +212,9 @@ function(parm, name = character(), type = getType(parm), kind = getTypeKind(type
          class = getBuiltinRTypeFromKind(getTypeKind(info$baseType))
 #         browser()
          if(length(class) == 0) {
-           if(grepl("*", typeName, fixed = TRUE))
+             if(info$depth == 1 && getTypeKind(info$baseType) == RCIndex:::CXType_Elaborated)
+                class = getPtrClassName(getName(info$baseType))
+             else if(grepl("*", typeName, fixed = TRUE))
               #!!!! changed Jul 2 (2013). Was just getName(info$baseType), i.e. no Ptr.
              class = sprintf("%sPtr", getName(info$baseType))
            else
