@@ -94,7 +94,18 @@ function(desc, rname, cname, op = "get")
                         makeFieldAccessorRoutineName(cname, op),
                    if(op == "get") "" else ", value"),
            if(op != "get") "x"
-        )
+      )
+
+  if(op == "set") {
+      rtypes = paste(sQuote(names(desc)), sQuote(sapply(desc, getRTypeName)), sep = " = ", collapse = ", ")
+      code[1] = sprintf(".fieldNames = c(%s)", rtypes)
+      code[c(2, 4)] = gsub(".fieldNames", "names(.fieldNames)", code[c(2, 4)])
+      code = c(code[1:3],
+               "value = if(.fieldNames[[i]] == 'numeric') as.numeric(value) else as(value, .fieldNames[[i]])",
+               code[4:5])
+  }
+  
+  code
 }
 
 makeRStructMethod =
