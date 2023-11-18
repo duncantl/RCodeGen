@@ -228,7 +228,8 @@ function(from, to, code, obj = new("RAsDefinition"))
 #setAs("NativeRoutineDefinition", "character", function(from) from@code)
 setAs("NativeRoutineDefinition", "character",
        function(from) {
-         paste(c(if(!is.na(from@declaration)) from@declaration else character(),
+           paste(c(
+#           if(!is.na(from@declaration)) from@declaration else character(),
 #           "{",
            from@code
 # ,         "}"
