@@ -6,6 +6,42 @@
 
 
 <topic>
+  <title>Structures</title>
+  <items>
+    <item>
+      Pass to routine.
+    </item>
+    <item>
+      Have makeCCopyStructCode handle structure objects in the fields, e.g. timeval in rusage.
+    </item>
+    <item status="verify">
+      Coerce value in $&lt;- operator for Ptr class.
+      Put them in  the vector names, i.e. the target class and then use as().
+      Allow for pointer to struct or R struct object.
+      <br/>
+      In place, but as(1L,"numeric") returns an integer.
+      So have to add explicit check for this.
+    </item>
+    <item status="check">Fix crashing</item>    
+    <item status="check">
+      Fix the rusagePtr() constructor when setting ...  Can't use $ operator of course.
+    </item>    
+    <item status="check">
+      Add setAs(rusage, rusagePtr) and other way around. See coerceRToStruct()
+    </item>
+    <item status="check">
+      Have makeCCopyStructCode() create an S4 instance of the R class and set the slots.
+    </item>    
+    <item status="check">
+      Get the name of the routines correct when we have a space, e.g., "struct rusage"
+    </item>
+    <item status="done">
+      Use makeCCopyStructCode()
+    </item>    
+  </items>
+</topic>
+
+<topic>
 <title>Rpoppler</title>
 <items>
 <item>
@@ -73,6 +109,11 @@ RObject - copystruct, enum and Guchar *
 <topic>
 <title>Sub-classes with R functions</title>
 <items>
+
+<item>
+Fix createMethod  to use the correct R class for representing the
+code, not just a list.
+</item>
 
 <item>
 Check if we have to REdeclare static methods as static.
