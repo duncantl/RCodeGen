@@ -36,7 +36,7 @@ createCopyStruct =
   # The code
   # Make certain a class is defined in R to accept the result
   # Then assign each field to the slot
-function(def,  className = def@name, isClass = FALSE, typeMap = list())
+function(def,  className = def@name, isClass = FALSE, typeMap = list(), fields = def@fields)
 {
   # Need to change this for RCIndex
 if(FALSE) {  
@@ -48,7 +48,7 @@ if(FALSE) {
   } else 
      decl = getNativeDeclaration(character(), def, character(), addSemiColon = FALSE, const = TRUE)
 } else {
-   decl = sprintf("const %s ", def$name)
+   decl = sprintf("const %s ", def@name)
 }
 
    routineName = getStructCopyRoutineName(def, className)
@@ -65,9 +65,9 @@ if(FALSE) {
                "PROTECT(klass);",
                "PROTECT(r_ans = NEW(klass));\n")
    els =
-     sapply(names(def$fields),
+     sapply(names(fields),
            function(fieldName) {
-             cv = convertValueToR(def$fields[[fieldName]], paste('value ->', fieldName), typeMap = typeMap)
+             cv = convertValueToR(fields[[fieldName]], paste('value ->', fieldName), typeMap = typeMap)
              fieldName = fixupFieldName(fieldName)
              paste('PROTECT(r_ans = SET_SLOT(r_ans, Rf_install("', fieldName, '"), ', cv, " ));", sep = "")
            })
@@ -76,7 +76,7 @@ if(FALSE) {
    native = paste(c(native[1],
                         paste("\t", c(native[-1],
                                       els,
-                                      paste("UNPROTECT(", length(def$fields) + 2, ");"),
+                                      paste("UNPROTECT(", length(fields) + 2, ");"),
                                       "",
                                       "return(r_ans);")),
                    "}"),
@@ -85,7 +85,7 @@ if(FALSE) {
 
    native = c(native,
               els,
-              paste("UNPROTECT(", length(def$fields) + 2, ");"),
+              paste("UNPROTECT(", length(fields) + 2, ");"),
               "",
               "return(r_ans);",
               "}")
